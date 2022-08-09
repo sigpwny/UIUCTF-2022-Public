@@ -1,0 +1,25 @@
+name: "Dad's Rules"
+author: "YiFei Zhu"
+category: systems
+description: |-
+  IPv6 is so complicated... Why is RFC 4861 so long?! And then there's
+  RFC 4862...
+
+  `$ stty raw -echo isig; nc dads-rules.chal.uiuc.tf 1337`
+
+  **author**: YiFei Zhu
+value: 500
+type: dynamic
+extra:
+  initial: 500
+  decay: 75
+  minimum: 50
+flags:
+  - uiuctf{wait_the_hop_limit_matters?!_4c1bda13}
+tags:
+  - systems
+  - ipv6
+files:
+  - challenge/handout.tar.zst
+state: visible
+version: "0.1"

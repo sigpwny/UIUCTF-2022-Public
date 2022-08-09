@@ -1,0 +1,26 @@
+name: "WASM 1: AOT"
+author: "richyliu"
+category: pwn
+description: |-
+  I'm using an open source WebAssembly sandbox with over 3.5k stars on GitHub!
+  Something that popular can't possibly be hacked, right?
+
+  `$ nc wasm1.chal.uiuc.tf 1337`
+
+  **author**: richyliu
+value: 500
+type: dynamic
+extra:
+  initial: 500
+  decay: 75
+  minimum: 50
+flags:
+  - uiuctf{c4n_y0u_3ven_ca1l_th1s_a_z3ro_d4y???_56fba7b4}
+tags:
+  - pwn
+files:
+  - challenge/handout.tar.gz
+hints:
+  - No zero-day required.
+state: visible
+version: "0.1"

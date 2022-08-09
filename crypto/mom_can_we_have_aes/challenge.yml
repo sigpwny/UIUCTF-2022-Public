@@ -1,0 +1,28 @@
+name: "mom can we have AES"
+author: "Random Object No.79"
+category: crypto
+description: |-
+  No dear, we already have AES at home.
+
+  `$ nc mom-can-we-have-aes.chal.uiuc.tf 1337`  
+  `$ nc mom-can-we-have-aes.chal.uiuc.tf 1338`
+
+  Shoutouts to Ankur, Richard and Yifei for helping with this challenge!
+
+  **author**: Random Object No.79
+value: 500
+type: dynamic
+extra:
+  initial: 500
+  decay: 75
+  minimum: 50
+flags:
+    - uiuctf{AES_@_h0m3_b3_l1ke3}
+tags:
+  - crypto
+  - net
+  - aes
+files:
+    - challenge/server.py
+    - challenge/client.py
+state: hidden

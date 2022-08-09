@@ -1,0 +1,129 @@
+From f572b8415097272b0edf5d8f0eea73aa4f893397 Mon Sep 17 00:00:00 2001
+From: YiFei Zhu <zhuyifei@google.com>
+Date: Tue, 14 Jun 2022 04:50:43 -0700
+Subject: [PATCH] Implement UIUCTFPORTIO device
+
+We want to have a way to prove they absolutely have arbitrary code
+execution for he challenge, and I wanna do something cool. vsock
+is one, but that needs a kernel module on host, and vhost-user-vsock
+is using some not-well-documented interfaces that I can't figure out
+how to use. virtio-9p is kinda lame, and MMIO is too difficult
+(needs to go through the kernel page tables), so I'm going to do
+port-mapped IO at a constant.
+
+Signed-off-by: YiFei Zhu <zhuyifei@google.com>
+---
+ hw/i386/pc.c           |  3 ++
+ hw/misc/meson.build    |  2 ++
+ hw/misc/uiuctfportio.c | 76 ++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 81 insertions(+)
+ create mode 100644 hw/misc/uiuctfportio.c
+
+diff --git a/hw/i386/pc.c b/hw/i386/pc.c
+index fd55fc725c..4c59df5114 100644
+--- a/hw/i386/pc.c
++++ b/hw/i386/pc.c
+@@ -1136,6 +1136,9 @@ void pc_basic_device_init(struct PCMachineState *pcms,
+     /* Super I/O */
+     pc_superio_init(isa_bus, create_fdctrl, pcms->i8042_enabled,
+                     pcms->vmport != ON_OFF_AUTO_ON);
++
++    ISADevice *uiuctfportio = isa_new("uiuctfportio");
++    isa_realize_and_unref(uiuctfportio, isa_bus, &error_fatal);
+ }
+ 
+ void pc_nic_init(PCMachineClass *pcmc, ISABus *isa_bus, PCIBus *pci_bus)
+diff --git a/hw/misc/meson.build b/hw/misc/meson.build
+index 6fb69612e0..8796949bd7 100644
+--- a/hw/misc/meson.build
++++ b/hw/misc/meson.build
+@@ -133,3 +133,5 @@ specific_ss.add(when: 'CONFIG_MIPS_CPS', if_true: files('mips_cmgcr.c', 'mips_cp
+ specific_ss.add(when: 'CONFIG_MIPS_ITU', if_true: files('mips_itu.c'))
+ 
+ specific_ss.add(when: 'CONFIG_SBSA_REF', if_true: files('sbsa_ec.c'))
++
++softmmu_ss.add(files('uiuctfportio.c'))
+diff --git a/hw/misc/uiuctfportio.c b/hw/misc/uiuctfportio.c
+new file mode 100644
+index 0000000000..5cd228bdc2
+--- /dev/null
++++ b/hw/misc/uiuctfportio.c
+@@ -0,0 +1,76 @@
++// SPDX-License-Identifier: GPL-2.0-or-later
++/*
++ * Copyright 2021-2022 Google LLC.
++ */
++
++#include "qemu/osdep.h"
++#include "qapi/error.h"
++#include "hw/sysbus.h"
++#include "hw/i386/pc.h"
++#include <unistd.h>
++
++#define TYPE_UIUCTFPORTIO "uiuctfportio"
++#define UIUCTFPORTIO(obj) OBJECT_CHECK(UiuctfportioState, (obj), TYPE_UIUCTFPORTIO)
++
++typedef struct {
++    ISADevice parent_obj;
++    PortioList portio_list;
++    ptrdiff_t read_offset;
++} UiuctfportioState;
++
++static char message[] = "uiuctf{what_could_possibly_go_wrong_be6e0fbe}\n";
++
++static uint32_t uiuctfportio_readb(void *opaque, uint32_t address)
++{
++    UiuctfportioState *sio = opaque;
++
++    if (sio->read_offset == sizeof(message))
++        return 0;
++
++    return message[sio->read_offset++];
++}
++
++static const MemoryRegionPortio uiuctfportio_list[] = {
++    {0, 1, 1, .read = uiuctfportio_readb },
++    PORTIO_END_OF_LIST(),
++};
++
++static void uiuctfportio_realize(DeviceState *d, Error **errp)
++{
++    ISADevice *dev = ISA_DEVICE(d);
++    UiuctfportioState *sio = UIUCTFPORTIO(d);
++
++    sio->read_offset = 0;
++
++    isa_register_portio_list(dev, &sio->portio_list, 0x2022,
++                             uiuctfportio_list, sio, "uiuctfportio");
++}
++
++static void uiuctfportio_reset(DeviceState *d)
++{
++    UiuctfportioState *sio = UIUCTFPORTIO(d);
++
++    sio->read_offset = 0;
++}
++
++static void uiuctfportio_class_init(ObjectClass *klass, void *data)
++{
++    DeviceClass *dc = DEVICE_CLASS(klass);
++    dc->realize = uiuctfportio_realize;
++    dc->reset = uiuctfportio_reset;
++    set_bit(DEVICE_CATEGORY_MISC, dc->categories);
++}
++
++static const TypeInfo uiuctfportio_info =
++{
++    .name           = TYPE_UIUCTFPORTIO,
++    .parent         = TYPE_ISA_DEVICE,
++    .instance_size  = sizeof(UiuctfportioState),
++    .class_init     = uiuctfportio_class_init,
++};
++static void uiuctfportio_register_types(void)
++{
++    type_register_static(&uiuctfportio_info);
++}
++
++type_init(uiuctfportio_register_types)
+-- 
+2.35.1

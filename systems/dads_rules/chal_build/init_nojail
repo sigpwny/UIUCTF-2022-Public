@@ -1,0 +1,31 @@
+#!/bin/bash
+# Copyright 2021-2022 Google LLC.
+# SPDX-License-Identifier: MIT
+
+export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+set -x
+
+mount -n -t proc -o nosuid,noexec,nodev proc /proc/
+
+mkdir -p /dev /sys /etc
+
+mount -n -t devtmpfs -o mode=0755,nosuid,noexec devtmpfs /dev
+mount -n -t sysfs -o nosuid,noexec,nodev sys /sys
+mount -n -t tmpfs -o mode=1777 tmpfs /tmp
+
+if ! mount -n -t 9p flag -o nosuid,noexec,nodev,version=9p2000.L,trans=virtio,msize=104857600 /mnt; then
+    mount -n -t tmpfs -o nosuid,noexec,nodev tmpfs /mnt
+    echo 'uiuctf{FAKEFLAG}' > /mnt/flag
+fi
+
+sysctl -qw net.ipv6.conf.all.accept_ra=1
+sysctl -qw net.ipv6.conf.default.accept_ra=1
+
+ip netns add jail
+. /home/user/setup.sh
+
+touch /run/netns/init
+mount --bind /proc/self/ns/net /run/netns/init
+
+exec ip netns exec jail setsid bash -l 0<>"/dev/ttyS0" 1>&0 2>&0

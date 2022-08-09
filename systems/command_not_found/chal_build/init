@@ -1,0 +1,27 @@
+#!/bin/bash
+# Copyright 2021-2022 Google LLC.
+# SPDX-License-Identifier: MIT
+
+export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+set -x
+
+mount -n -t proc -o nosuid,noexec,nodev proc /proc/
+mount -n -o remount,rw /
+
+mkdir -p /dev /sys /etc
+
+mount -n -t devtmpfs -o mode=0755,nosuid,noexec devtmpfs /dev
+mount -n -t sysfs -o nosuid,noexec,nodev sys /sys
+mount -n -t tmpfs -o mode=1777 tmpfs /tmp
+
+ln -s /proc/self/mounts /etc/mtab
+
+ip link set dev lo up
+
+ip link set dev eth0 up
+ip addr add 10.0.2.15 dev eth0
+ip route add 10.0.2.0/24 dev eth0
+ip route add default via 10.0.2.2
+
+exec setsid bash -l 0<>"/dev/ttyS0" 1>&0 2>&0

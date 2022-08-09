@@ -1,0 +1,17 @@
+apiVersion: kctf.dev/v1
+kind: Challenge
+metadata:
+  name: bro-key-n
+spec:
+  deployed: true
+  powDifficultySeconds: 0
+  network:
+    public: true
+    ports:
+      - protocol: "TCP"
+        port: 1337
+        targetPort: 1337
+  healthcheck:
+    enabled: true
+    image: us.gcr.io/dotted-forest-314903/bro-key-n-healthcheck:4716b669de0063b16ed502ed14e0386d093c1f69422004f30c167bd3113f6765
+  image: us.gcr.io/dotted-forest-314903/bro-key-n-challenge:bdae2465057e8fb6efa36707155b56ba65291c370818a2e2a50840ee35255e93

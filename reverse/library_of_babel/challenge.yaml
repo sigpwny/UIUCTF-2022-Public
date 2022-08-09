@@ -1,0 +1,17 @@
+apiVersion: kctf.dev/v1
+kind: Challenge
+metadata:
+  name: library-of-babel
+spec:
+  deployed: true
+  powDifficultySeconds: 0
+  network:
+    public: true
+    ports:
+      - protocol: "TCP"
+        port: 1337
+        targetPort: 1337
+  healthcheck:
+    enabled: true
+    image: us.gcr.io/dotted-forest-314903/library-of-babel-healthcheck:d999502d21da9f7b3f23f09a6f678851e333a1aadcac9575720d05f6708ca31e
+  image: us.gcr.io/dotted-forest-314903/library-of-babel-challenge:69750ff2869cb8b9a352c1cd7506e0e554dee9e0db849fb97cb99b8919f49e9f

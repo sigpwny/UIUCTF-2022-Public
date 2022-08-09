@@ -1,0 +1,24 @@
+name: "Dad's Rules Fixed"
+author: "YiFei Zhu"
+category: systems
+description: |-
+  Netfilter is also too complicated.
+
+  `$ stty raw -echo isig; nc dads-rules-fixed.chal.uiuc.tf 1337`
+
+  **author**: YiFei Zhu
+value: 500
+type: dynamic
+extra:
+  initial: 500
+  decay: 75
+  minimum: 50
+flags:
+  - uiuctf{wait_theres_a_bridge_family?!_f81a1c2c}
+tags:
+  - systems
+  - ipv6
+files:
+  - challenge/handout.tar.zst
+state: visible
+version: "0.1"

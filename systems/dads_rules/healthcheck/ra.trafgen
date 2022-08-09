@@ -1,0 +1,44 @@
+{
+  eth(daddr=8a:15:22:31:b4:fc)
+  ipv6(nexthdr=58,hoplimit=255,saddr=fe80::48c5:2dff:fe9b:8c8d,daddr=fe80::8815:22ff:fe31:b4fc)
+  # See RFC 4861
+  # icmp6(type=134,code=0)
+  134, 0
+  c16(0x6e5f)
+  # Cur Hop Limit
+  c8(127)
+  # Autoconfig Flags
+  c8(0)
+  # Router Lifetime
+  c16(9000)
+  # Reachable Time
+  c32(0)
+  # Retrans Timer
+  c32(0)
+
+  # Options
+  # Type = Source Link Layer address
+  c8(1)
+  # Length
+  c8(1)
+  # 4a:c5:2d:9b:8c:8d
+  0x4a, 0xc5, 0x2d, 0x9b, 0x8c, 0x8d
+
+  # Type = Prefix Information
+  c8(3)
+  # Length
+  c8(4)
+  # Prefix Length
+  c8(64)
+  # Flags = onlink | auto
+  c8(0b11000000)
+  # Valid Lifetime
+  c32(-1)
+  # Preferred Lifetime
+  c32(-1)
+  # Reserved
+  c32(0)
+  # 2001:db8:6e02:2663::
+  c16(0x2001), c16(0xdb8), c16(0x6e02), c16(0x2663)
+  c16(0), c16(0), c16(0), c16(0)
+}

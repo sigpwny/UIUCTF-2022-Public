@@ -1,0 +1,20 @@
+name: "easy math 1"
+author: "kuilin"
+category: pwn
+description: |-
+  Take a break from exploiting binaries, and solve a few* simple math problems!
+
+  `$ ssh ctf@easy-math.chal.uiuc.tf -p 222`
+  password is `ctf`
+
+  **author**: kuilin
+value: 500
+type: dynamic
+extra:
+  initial: 500
+  decay: 75
+  minimum: 50
+flags:
+  - uiuctf{now do it the fun way :D}
+state: visible
+version: "0.1"

@@ -1,0 +1,14 @@
+apiVersion: kctf.dev/v1
+kind: Challenge
+metadata:
+  name: log
+spec:
+  deployed: true
+  powDifficultySeconds: 0
+  network:
+    public: true
+  healthcheck:
+    # TIP: disable the healthcheck during development
+    enabled: true
+    image: us.gcr.io/dotted-forest-314903/log-healthcheck:81f2a6b5f4bf69057bfde0b041e024636d2b10a8e450541a8ace2d7746b70871
+  image: us.gcr.io/dotted-forest-314903/log-challenge:5343262056ceb105791037fd24df25c6013912c0f34eb7946d98ffb677de988b

@@ -1,0 +1,8 @@
+Take a break from exploiting binaries, and solve a few* simple math problems!
+
+Note: You can use /tmp to store files. We installed a bunch of tools for your hacking convenience:
+
+    sudo apt-get install vim nano gdb git python3-dev gcc build-essential
+
+Have fun!
+

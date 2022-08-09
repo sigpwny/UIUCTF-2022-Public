@@ -1,0 +1,26 @@
+# This file represents the base specification of your challenge. It is used by
+# other tools to install and deploy your challenge.
+# Required sections
+name: AR Pwny
+author: ian5v
+category: web
+description: |-
+  Welcome to the meataverse!
+
+  http://ar-pwny-web.chal.uiuc.tf/
+
+  **author**: ian5v
+value: 500
+type: dynamic
+tags:
+  - web
+  - ar
+  - beginner
+extra:
+  initial: 500
+  decay: 75
+  minimum: 50
+flags:
+  - uiuctf{welcome_2_the_meataverse_erm_i_meant_pwnyverse}
+state: visible
+version: "0.1"

@@ -1,0 +1,46 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: INSTANCE_NAME
+  namespace: woeby-managed
+  labels:
+    name: INSTANCE_NAME
+spec:
+  activeDeadlineSeconds: 600
+  backoffLimit: 0
+  template:
+    metadata:
+      labels:
+        app: woeby
+        name: INSTANCE_NAME
+    spec:
+      enableServiceLinks: false
+      automountServiceAccountToken: false
+      containers:
+        - name: challenge
+          image: us.gcr.io/dotted-forest-314903/woeby-challenge:b02d87e74d13bedde35a0c7bd4e68dec83d89fc70cafc8f25bf984520ec5e956
+          ports:
+            - containerPort: 80
+          securityContext:
+            privileged: false
+            readOnlyRootFilesystem: false
+      restartPolicy: Never
+  ttlSecondsAfterFinished: 0
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: INSTANCE_NAME
+  namespace: woeby-managed
+  labels:
+    name: INSTANCE_NAME
+  ownerReferences: null
+spec:
+  selector:
+    app: woeby
+    name: INSTANCE_NAME
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 80
+  type: ClusterIP

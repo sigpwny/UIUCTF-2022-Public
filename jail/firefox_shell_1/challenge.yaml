@@ -1,0 +1,17 @@
+apiVersion: kctf.dev/v1
+kind: Challenge
+metadata:
+  name: firefox-cli-1
+spec:
+  deployed: true
+  powDifficultySeconds: 0
+  network:
+    public: true
+    ports:
+      - protocol: "TCP"
+        port: 1337
+        targetPort: 1337
+  healthcheck:
+    enabled: true
+    image: us.gcr.io/dotted-forest-314903/firefox-cli-1-healthcheck:30f86ccbcda5c14142cd9531843f6f5ceb6af9320a15e9310736af27e5687f76
+  image: us.gcr.io/dotted-forest-314903/firefox-cli-1-challenge:f0e6c2712d918a110992841b5740c33b4d3cac12540fcac7b38307b02861448d

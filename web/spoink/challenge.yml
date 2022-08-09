@@ -1,0 +1,24 @@
+name: spoink
+author: arxenix
+category: web
+description: |-
+  forget PHP, Java is the new best thing
+
+  instancer: https://spoink.chal.uiuc.tf
+
+  **author**: arxenix
+value: 500
+type: dynamic
+extra:
+  initial: 500
+  decay: 75
+  minimum: 50
+flags:
+  - uiuctf{gRumP1g_iS_uglY}
+tags:
+  - web
+  - java
+files:
+  - handout.tar.gz
+state: visible
+version: "0.1"

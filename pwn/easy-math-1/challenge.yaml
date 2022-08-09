@@ -1,0 +1,21 @@
+apiVersion: kctf.dev/v1
+kind: Challenge
+metadata:
+  name: easy-math
+spec:
+  deployed: true
+  powDifficultySeconds: 0
+  network:
+    public: true
+    ports:
+      - protocol: "TCP"
+        port: 222
+        targetPort: 1337
+      - protocol: "TCP"
+        port: 22
+        targetPort: 1337
+  healthcheck:
+    # TIP: disable the healthcheck during development
+    enabled: true
+    image: us.gcr.io/dotted-forest-314903/easy-math-healthcheck:f3228809d6a106895daaaf32831859e7415077d79d888c01e233c833ac7c45f8
+  image: us.gcr.io/dotted-forest-314903/easy-math-challenge:83c29364145dd0c9414521b94d6eb8bf1429e433b0ff07a4acfae276ab553e78

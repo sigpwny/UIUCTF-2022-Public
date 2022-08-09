@@ -1,0 +1,23 @@
+name: "Everyone's A Critic 1"
+author: "Thomas"
+category: osint
+description: "There is a video game reviews content creator who has somehow ended up reviewing UIUCTF, make sure their reviews are not too harsh by investigating them!. Start by finding them on the UIUCTF Discord!"
+value: 500
+type: dynamic
+extra:
+  initial: 500
+  decay: 75
+  minimum: 50
+flags:
+    - uiuctf{this_flag_is_not_bait_im_serious_its_not_just_trust_me_bro}
+tags:
+    - osint
+    - discord
+hints:
+    - The first two characters of the flag after uiuctf{ are `th`
+    - This user is uniquely identifiable within the UIUCTF discord
+state: hidden
+
+# Specifies what version of the challenge specification was used.
+# Subject to change until ctfcli v1.0.0
+version: "0.1"

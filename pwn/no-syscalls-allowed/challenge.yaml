@@ -1,0 +1,22 @@
+apiVersion: kctf.dev/v1
+kind: Challenge
+metadata:
+  name: no-syscalls-allowed
+spec:
+  deployed: true
+  powDifficultySeconds: 0
+  network:
+    public: true
+    ports:
+      - protocol: "TCP"
+        port: 1337
+        targetPort: 1337
+  healthcheck:
+    # TIP: disable the healthcheck during development
+    enabled: true
+    image: us.gcr.io/dotted-forest-314903/no-syscalls-allowed-healthcheck:1774c455dce83c5b96340ea3d098c19c30f57a08ba429cc5c7cbd2d0c4fc2375
+  image: us.gcr.io/dotted-forest-314903/no-syscalls-allowed-challenge:a013207369610ad2d84a7dab176f76e09944ce3af3b907f4f2d754f587d411a4
+  horizontalPodAutoscalerSpec:
+    maxReplicas: 8
+    minReplicas: 2
+    targetCPUUtilizationPercentage: 60

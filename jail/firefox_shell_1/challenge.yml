@@ -1,0 +1,29 @@
+name: "Firefox Shell 1"
+author: "YiFei Zhu"
+category: jail
+description: |-
+  What if we port NodeJS's REPL and pretty printer to run on Firefox? And to
+  have some extra fun, we also exposed SpiderMonkey's Debugger API. What will
+  happen?
+
+  `$ nc firefox-cli-1.chal.uiuc.tf 1337`
+
+  **author**: YiFei Zhu
+value: 500
+type: dynamic
+extra:
+  initial: 500
+  decay: 75
+  minimum: 50
+flags:
+  - uiuctf{why_mozilla_why_docs_either_deleted_or_bad_3466658a}
+tags:
+  - jail
+  - firefox
+  - beginner
+files:
+  - handout.tar.gz
+hints:
+  - Look at the source code for the difference between this chal and the next one.
+state: visible
+version: "0.1"

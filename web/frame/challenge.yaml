@@ -1,0 +1,32 @@
+apiVersion: kctf.dev/v1
+kind: Challenge
+metadata:
+  name: frame
+spec:
+  deployed: true
+  powDifficultySeconds: 0
+  persistentVolumeClaims:
+    - frame
+  podTemplate:
+    template:
+      spec:
+        containers:
+          - name: challenge
+            volumeMounts:
+              - name: gcsfuse
+                subPath: uploads
+                mountPath: /chroot/web-apps/php/uploads
+        volumes:
+          - name: gcsfuse
+            persistentVolumeClaim:
+              claimName: frame
+  network:
+    public: true
+    ports:
+      - protocol: "HTTPS"
+        targetPort: 1337
+  healthcheck:
+    # TIP: disable the healthcheck during development
+    enabled: true
+    image: us.gcr.io/dotted-forest-314903/frame-healthcheck:e50cbb2176c8194bcad0a2bbc254cb895563bb01fea42a0fa442cfcbefc47b1c
+  image: us.gcr.io/dotted-forest-314903/frame-challenge:1f41e65d1d230f4c7b8d0d177e621ba1aea7346216086710ea1cfb0879e0d4a5

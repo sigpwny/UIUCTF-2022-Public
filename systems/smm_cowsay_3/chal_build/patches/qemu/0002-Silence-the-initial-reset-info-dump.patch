@@ -1,0 +1,33 @@
+From 0b5f70d625bd290769f8769f9b349c18bf7f9b17 Mon Sep 17 00:00:00 2001
+From: YiFei Zhu <zhuyifei@google.com>
+Date: Mon, 28 Mar 2022 19:02:21 -0700
+Subject: [PATCH 2/3] Silence the initial reset info dump
+
+If you really need this to do the chal, you can revert this change.
+I'm just silencing this so the chal is less noisy.
+
+Signed-off-by: YiFei Zhu <zhuyifei@google.com>
+---
+ hw/core/cpu-common.c | 6 ------
+ 1 file changed, 6 deletions(-)
+
+diff --git a/hw/core/cpu-common.c b/hw/core/cpu-common.c
+index 9e3241b430..311b46b358 100644
+--- a/hw/core/cpu-common.c
++++ b/hw/core/cpu-common.c
+@@ -119,12 +119,6 @@ void cpu_reset(CPUState *cpu)
+ static void cpu_common_reset(DeviceState *dev)
+ {
+     CPUState *cpu = CPU(dev);
+-    CPUClass *cc = CPU_GET_CLASS(cpu);
+-
+-    if (qemu_loglevel_mask(CPU_LOG_RESET)) {
+-        qemu_log("CPU Reset (CPU %d)\n", cpu->cpu_index);
+-        log_cpu_state(cpu, cc->reset_dump_flags);
+-    }
+ 
+     cpu->interrupt_request = 0;
+     cpu->halted = cpu->start_powered_off;
+-- 
+2.35.1
+

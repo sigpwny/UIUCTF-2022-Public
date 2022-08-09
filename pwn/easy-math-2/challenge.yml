@@ -1,0 +1,17 @@
+name: "easy math 2"
+author: "kuilin"
+category: pwn
+description: |-
+  The flag file for easy math 1 has information about how to solve this second part.
+  
+  **author**: kuilin
+value: 500
+type: dynamic
+extra:
+  initial: 500
+  decay: 75
+  minimum: 50
+flags:
+  - uiuctf{excellent execution}
+state: visible
+version: "0.1"

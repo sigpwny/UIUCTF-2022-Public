@@ -1,0 +1,42 @@
+# This file represents the base specification of your challenge. It is used by
+# other tools to install and deploy your challenge.
+
+# Required sections
+name: "precisionism"
+author: "arxenix"
+category: web
+description: |-
+  Steal the flag :)
+
+  https://precisionism-web.chal.uiuc.tf
+
+  ```py
+  from flask import Flask, Response, request
+  app = Flask(__name__)
+  
+  @app.route('/')
+  def index():
+      prefix = bytes.fromhex(request.args.get("p", default="", type=str))
+      flag = request.cookies.get("FLAG", default="uiuctf{FAKEFLAG}").encode() #^uiuctf{[0-9A-Za-z]{8}}$
+      return Response(prefix+flag+b"Enjoy your flag!", mimetype="text/plain")
+  ```
+
+  admin bot: `nc ism-bot.chal.uiuc.tf 1337`
+
+  **author**: arxenix
+value: 500
+type: dynamic
+tags:
+  - web
+  - extreme
+extra:
+  initial: 500
+  decay: 75
+  minimum: 50
+flags:
+  - uiuctf{gr92TwKp}
+files:
+  - ./handout.tar.gz
+# This is visible by default. It takes two values: hidden, visible.
+state: visible
+version: "0.1"

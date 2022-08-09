@@ -1,0 +1,26 @@
+name: "Reject to Inject"
+author: "yuiop"
+category: rev
+description: |-
+  Seems like the patient is afraid of needles. Can you go help him?
+
+  **author**: yuiop
+value: 500
+type: dynamic
+extra:
+  initial: 500
+  decay: 75
+  minimum: 50
+flags:
+  - uiuctf{0uch_righ7_0n_7h3_sp07}
+topics:
+  - dll injection
+  - WINAPI
+tags:
+  - rev
+  - windows
+  - beginner
+files:
+  - challenge/IV.dll
+state: visible
+version: "0.1"

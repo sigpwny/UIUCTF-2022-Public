@@ -1,0 +1,18 @@
+apiVersion: kctf.dev/v1
+kind: Challenge
+metadata:
+  name: revop
+spec:
+  deployed: true
+  powDifficultySeconds: 0
+  network:
+    public: true
+    ports:
+      - protocol: "TCP"
+        port: 1337
+        targetPort: 1337
+  healthcheck:
+    # TIP: disable the healthcheck during development
+    enabled: true
+    image: us.gcr.io/dotted-forest-314903/revop-healthcheck:64eea84548a60e5101ebb27df4b2d98e7852c0f575cb801c2f4523d4e416b26f
+  image: us.gcr.io/dotted-forest-314903/revop-challenge:e0aeeb3605955b1657ab7857c2c4597f05302dde8afc8f067a8d0548d4c3e3c7

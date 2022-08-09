@@ -1,0 +1,18 @@
+apiVersion: kctf.dev/v1
+kind: Challenge
+metadata:
+  name: odd-shell
+spec:
+  deployed: true
+  powDifficultySeconds: 0
+  network:
+    public: true
+    ports:
+      - protocol: "TCP"
+        port: 1337
+        targetPort: 1337
+  healthcheck:
+    # TIP: disable the healthcheck during development
+    enabled: true
+    image: us.gcr.io/dotted-forest-314903/odd-shell-healthcheck:050204247c4a2354013122d0126407432fb71e05c06b7fbee4a9cba20ae160f8
+  image: us.gcr.io/dotted-forest-314903/odd-shell-challenge:24a5c3597632585dd49542eb61b25aee361a3022459ac2ebaef7b5ed2afe714b

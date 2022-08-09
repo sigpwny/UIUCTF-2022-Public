@@ -1,0 +1,86 @@
+From 71609b5cf98b6fceda7d3a53416141efe73541fe Mon Sep 17 00:00:00 2001
+From: YiFei Zhu <zhuyifei@google.com>
+Date: Mon, 28 Mar 2022 19:41:23 -0700
+Subject: [PATCH 2/8] ShellPkg: Simplify Shell
+
+- We don't need to print the map layout. If you want it you can run
+  "map" manually.
+- No timeout. We want to binexec immediately to demonstrate how to
+  actually invoke it. If you need the shell you can exit binexec.
+
+Signed-off-by: YiFei Zhu <zhuyifei@google.com>
+---
+ ShellPkg/Application/Shell/Shell.c | 39 ------------------------------
+ 1 file changed, 39 deletions(-)
+
+diff --git a/ShellPkg/Application/Shell/Shell.c b/ShellPkg/Application/Shell/Shell.c
+index df00adfdfa..c737a7dbfa 100644
+--- a/ShellPkg/Application/Shell/Shell.c
++++ b/ShellPkg/Application/Shell/Shell.c
+@@ -551,14 +551,6 @@ UefiMain (
+         );
+     }
+ 
+-    //
+-    // Display the mapping
+-    //
+-    if ((PcdGet8 (PcdShellSupportLevel) >= 2) && !ShellInfoObject.ShellInitSettings.BitUnion.Bits.NoMap) {
+-      Status = RunCommand (L"map");
+-      ASSERT_EFI_ERROR (Status);
+-    }
+-
+     //
+     // init all the built in alias'
+     //
+@@ -1294,15 +1286,10 @@ DoStartupScript (
+ {
+   EFI_STATUS     Status;
+   EFI_STATUS     CalleeStatus;
+-  UINTN          Delay;
+-  EFI_INPUT_KEY  Key;
+   CHAR16         *FileStringPath;
+   CHAR16         *FullFileStringPath;
+   UINTN          NewSize;
+ 
+-  Key.UnicodeChar = CHAR_NULL;
+-  Key.ScanCode    = 0;
+-
+   if (!ShellInfoObject.ShellInitSettings.BitUnion.Bits.Startup && (ShellInfoObject.ShellInitSettings.FileName != NULL)) {
+     //
+     // launch something else instead
+@@ -1343,32 +1330,6 @@ DoStartupScript (
+     return (EFI_SUCCESS);
+   }
+ 
+-  gST->ConOut->EnableCursor (gST->ConOut, FALSE);
+-  //
+-  // print out our warning and see if they press a key
+-  //
+-  for ( Status = EFI_UNSUPPORTED, Delay = ShellInfoObject.ShellInitSettings.Delay
+-        ; Delay != 0 && EFI_ERROR (Status)
+-        ; Delay--
+-        )
+-  {
+-    ShellPrintHiiEx (0, gST->ConOut->Mode->CursorRow, NULL, STRING_TOKEN (STR_SHELL_STARTUP_QUESTION), ShellInfoObject.HiiHandle, Delay);
+-    gBS->Stall (1000000);
+-    if (!ShellInfoObject.ShellInitSettings.BitUnion.Bits.NoConsoleIn) {
+-      Status = gST->ConIn->ReadKeyStroke (gST->ConIn, &Key);
+-    }
+-  }
+-
+-  ShellPrintHiiEx (-1, -1, NULL, STRING_TOKEN (STR_SHELL_CRLF), ShellInfoObject.HiiHandle);
+-  gST->ConOut->EnableCursor (gST->ConOut, TRUE);
+-
+-  //
+-  // ESC was pressed
+-  //
+-  if ((Status == EFI_SUCCESS) && (Key.UnicodeChar == 0) && (Key.ScanCode == SCAN_ESC)) {
+-    return (EFI_SUCCESS);
+-  }
+-
+   FileStringPath = LocateStartupScript (ImagePath, FilePath);
+   if (FileStringPath != NULL) {
+     FullFileStringPath = FullyQualifyPath (FileStringPath);
+-- 
+2.35.1
+

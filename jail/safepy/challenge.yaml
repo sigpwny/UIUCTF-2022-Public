@@ -1,0 +1,18 @@
+apiVersion: kctf.dev/v1
+kind: Challenge
+metadata:
+  name: safepy
+spec:
+  deployed: true
+  powDifficultySeconds: 0
+  network:
+    public: true
+    ports:
+      - protocol: "TCP"
+        port: 1337
+        targetPort: 1337
+  healthcheck:
+    # TIP: disable the healthcheck during development
+    enabled: true
+    image: us.gcr.io/dotted-forest-314903/safepy-healthcheck:33b5f8c3997bc51ff5dd1ab8a625fcfcecb973f30b1da9b00b331490ff90c7ef
+  image: us.gcr.io/dotted-forest-314903/safepy-challenge:58c1d5125d267759b2f33c662d9683698933a47029fb2fbd0ad477bada13be3c

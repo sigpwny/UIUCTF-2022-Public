@@ -1,0 +1,18 @@
+apiVersion: kctf.dev/v1
+kind: Challenge
+metadata:
+  name: wasm2
+spec:
+  deployed: true
+  powDifficultySeconds: 0
+  network:
+    public: true
+    ports:
+      - protocol: "TCP"
+        port: 1337
+        targetPort: 1337
+  healthcheck:
+    # TIP: disable the healthcheck during development
+    enabled: true
+    image: us.gcr.io/dotted-forest-314903/wasm2-healthcheck:9a3098cc2e027f4584cafdef03a61948bcabd44075fee3c8c51dd07e47dc9eab
+  image: us.gcr.io/dotted-forest-314903/wasm2-challenge:1a19d66a2dba8475dc2f385aac97a2b3676e8edf819ee0b98fb8e709df448356

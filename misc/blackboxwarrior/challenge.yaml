@@ -1,0 +1,31 @@
+apiVersion: kctf.dev/v1
+kind: Challenge
+metadata:
+  name: blackbox
+spec:
+  deployed: true
+  powDifficultySeconds: 0
+  podTemplate:
+    template:
+      spec:
+        containers:
+          - name: challenge
+            volumeMounts:
+              - mountPath: /tmp
+                name: tmpfs
+                subPath: tm
+        volumes:
+          - name: tmpfs
+            emptyDir:
+              medium: Memory
+              sizeLimit: 512Mi
+  network:
+    public: true
+    ports:
+      - protocol: "HTTPS"
+        targetPort: 1337
+  healthcheck:
+    # TIP: disable the healthcheck during development
+    enabled: false
+    image: us.gcr.io/dotted-forest-314903/blackbox-healthcheck:c1030aa070554f70de18e895a71f91d4be348fdcb6b9fa1358a448db63391a75
+  image: us.gcr.io/dotted-forest-314903/blackbox-challenge:dbc67f134aa1a0c67f601ac9fb4af99ae8c57f7d0346bc47c9cd7db3892a4e6c

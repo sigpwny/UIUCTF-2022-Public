@@ -1,0 +1,4 @@
+﻿  gen.cpp
+D:\BACKUP\user\Downloads\nightdream\ref\rejecttoinject\final\src\IV\IV\gen.cpp(94,24): warning C4267: 'initializing': conversion from 'size_t' to 'int', possible loss of data
+D:\BACKUP\user\Downloads\nightdream\ref\rejecttoinject\final\src\IV\IV\gen.cpp(106,30): warning C4267: 'initializing': conversion from 'size_t' to 'int', possible loss of data
+  IV.vcxproj -> D:\BACKUP\user\Downloads\nightdream\ref\rejecttoinject\final\src\IV\x64\Debug\IV.dll

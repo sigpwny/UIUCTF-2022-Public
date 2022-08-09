@@ -1,0 +1,17 @@
+apiVersion: kctf.dev/v1
+kind: Challenge
+metadata:
+  name: modernism
+spec:
+  deployed: true
+  powDifficultySeconds: 0
+  network:
+    public: true
+    ports:
+      - protocol: "HTTPS"
+        targetPort: 1337
+  healthcheck:
+    # TIP: disable the healthcheck during development
+    enabled: true
+    image: us.gcr.io/dotted-forest-314903/modernism-healthcheck:10340dfd87d70d6a082103ceefb686af0ec30cd40f6f85ae4480e761647a3e04
+  image: us.gcr.io/dotted-forest-314903/modernism-challenge:0746eaafbc3930828eac2c6153d88943485fb2a92369d50d1b57fc6cf99e4382

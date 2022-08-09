@@ -1,0 +1,17 @@
+apiVersion: kctf.dev/v1
+kind: Challenge
+metadata:
+  name: smm-cowsay-1
+spec:
+  deployed: true
+  powDifficultySeconds: 0
+  network:
+    public: true
+    ports:
+      - protocol: "TCP"
+        port: 1337
+        targetPort: 1337
+  healthcheck:
+    enabled: true
+    image: us.gcr.io/dotted-forest-314903/smm-cowsay-1-healthcheck:515ffb719ef1a28c841098b8b183628e3550221dc9da4beaf0d66937648be2b3
+  image: us.gcr.io/dotted-forest-314903/smm-cowsay-1-challenge:34e97349041b2f985c0731a8229944b9059eaf52f382290d783839051f45b5a7

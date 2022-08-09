@@ -1,0 +1,21 @@
+name: "easy math 3"
+author: "kuilin"
+category: pwn
+description: |-
+  Easy Math 2 had an unintended solve, which has been patched here. If your solution did not use that unintended solve, it should work here as-is:
+  
+  `ssh ctf-part-3@easy-math.chal.uiuc.tf`
+  
+  The password is `6d49a6fb` (not `ctf`)
+  
+  **author**: kuilin
+value: 500
+type: dynamic
+extra:
+  initial: 500
+  decay: 75
+  minimum: 50
+flags:
+  - uiuctf{file descriptors are literally magic}
+state: visible
+version: "0.1"

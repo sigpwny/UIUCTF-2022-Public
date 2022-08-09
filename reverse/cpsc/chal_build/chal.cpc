@@ -1,0 +1,155 @@
+#include <cpc/cpc_runtime.h>
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <stdint.h>
+#include <string.h>
+#include <assert.h>
+
+#define MAX_STRING_LENGTH 100
+
+static uint8_t char_from_hex(char hex) {
+    if (hex >= '0' && hex <= '9') {
+        return hex - '0';
+    }
+    if (hex >= 'a' && hex <= 'f') {
+        return hex - 'a' + 10;
+    }
+    if (hex >= 'A' && hex <= 'F') {
+        return hex - 'A' + 10;
+    }
+    printf("Invalid hex character: %c\n", hex);
+    assert(0);
+}
+
+static void from_hex(uint8_t* buf, const char* hex) {
+    size_t len = strlen(hex);
+    assert(len % 2 == 0);
+    for (int i = 0; i < len; i += 2) {
+        buf[i / 2] = (char_from_hex(hex[i]) << 4) | char_from_hex(hex[i + 1]);
+    }
+}
+
+static void print_hex(const uint8_t* buf, size_t len) {
+    for (int i = 0; i < len; i++) {
+        printf("%02x", buf[i]);
+    }
+}
+
+cps static uint8_t xorshift_byte(uint8_t c) {
+    c ^= c << 6;
+    c ^= c >> 7;
+    c ^= c << 1;
+    return c;
+}
+
+cps static void xor_pass(uint8_t* str, size_t len, int seed) {
+    uint8_t cur;
+
+    // xor pass
+    uint8_t xor_accum = 47 * seed;
+    for (size_t i = 0; i < len; i++) {
+        xor_accum ^= str[i];
+        xor_accum = xorshift_byte(xor_accum);
+        str[i] = xor_accum;
+    }
+
+    // xor again in reverse order
+    xor_accum = 51 * seed;
+    for (size_t i = 0; i < len; i++) {
+        xor_accum ^= str[len - i - 1];
+        xor_accum = xorshift_byte(xor_accum);
+        str[len - i - 1] = xor_accum;
+    }
+}
+
+cps static void merge(
+    uint8_t* new_str,
+    const uint8_t* str1, size_t left_len,
+    const uint8_t* str2, size_t right_len,
+    int n
+) {
+    // zipper merge
+    uint8_t* str = malloc(left_len + right_len);
+    size_t i = 0, j = 0, k = 0;
+    while (i < left_len || j < right_len) {
+        if (j < right_len) {
+            str[k] = str2[j];
+            j++;
+            k++;
+        }
+        if (i < left_len) {
+            str[k] = str1[i];
+            i++;
+            k++;
+        }
+    }
+    assert(k == left_len + right_len);
+    assert(abs(left_len - right_len) <= 1);
+
+    // reverse string
+    size_t total_len = left_len + right_len;
+    for (size_t i = 0; i < total_len; i++) {
+        new_str[i] = str[total_len - i - 1];
+    }
+
+    // use n, the "path" to get here (in binary) as a seed
+    xor_pass(new_str, total_len, n);
+
+    free(str);
+}
+
+cps static void mix(uint8_t* str, size_t len, int n) {
+    if (len <= 1) {
+        return;
+    }
+
+    // recursive case: split, mix, and zipper merge
+    size_t mid = len / 2;
+    size_t left_len = mid;
+    size_t right_len = len - mid;
+    mix(str, left_len, n << 1 | 0);
+    mix(str + mid, right_len, n << 1 | 1);
+
+    merge(str, str, left_len, str + mid, right_len, n);
+}
+
+cps static void mix_main(uint8_t* str, size_t len) {
+    mix(str, len, 1);
+}
+
+int main() {
+    uint8_t* input = malloc(MAX_STRING_LENGTH);
+
+    printf("--- M I X E R ---\n");
+    printf("Welcome to the Mixer.\n");
+    printf("Please enter the password: ");
+    fgets(input, MAX_STRING_LENGTH, stdin);
+    // strip trailing newline
+    input[strcspn(input, "\n")] = '\0';
+    size_t len = strlen(input);
+
+    char answer_hex[] = "e338e9cc0199e8c24b43760f2277cf56f9b7ddff343aaf116fe26cafca4538cfb9c26477e377d19a301e13";
+    size_t answer_len = strlen(answer_hex) / 2;
+    uint8_t* answer = calloc(sizeof(uint8_t), answer_len);
+    from_hex(answer, answer_hex);
+
+    cpc_spawn {
+        mix_main(input, len);
+        printf("Mixed: ");
+        print_hex(input, len);
+        printf("\n");
+
+        if (memcmp(input, answer, answer_len) == 0) {
+            printf("Correct! That's the flag!\n");
+        } else {
+            printf("Wrong.\n");
+        }
+
+        free(input);
+    }
+
+    cpc_main_loop();
+
+    return 0;
+}

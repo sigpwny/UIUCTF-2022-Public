@@ -1,0 +1,68 @@
+From 5e9fcfb7990d7e672377785443e50e1b5f1a3448 Mon Sep 17 00:00:00 2001
+From: YiFei Zhu <zhuyifei@google.com>
+Date: Sun, 10 Apr 2022 11:10:42 -0700
+Subject: [PATCH 5/5] PiSmmCpuDxeSmm: Open up all the page table access
+ restrictions
+
+Because why not ;) A few years ago SMM didn't even have paging
+and nothing ever went wrong, right? I mean, what could possibly
+go wrong?
+
+Signed-off-by: YiFei Zhu <zhuyifei@google.com>
+---
+ .../PiSmmCpuDxeSmm/SmmCpuMemoryManagement.c   | 39 ++-----------------
+ 1 file changed, 3 insertions(+), 36 deletions(-)
+
+diff --git a/UefiCpuPkg/PiSmmCpuDxeSmm/SmmCpuMemoryManagement.c b/UefiCpuPkg/PiSmmCpuDxeSmm/SmmCpuMemoryManagement.c
+index 1f7cc15727..4b341c39de 100644
+--- a/UefiCpuPkg/PiSmmCpuDxeSmm/SmmCpuMemoryManagement.c
++++ b/UefiCpuPkg/PiSmmCpuDxeSmm/SmmCpuMemoryManagement.c
+@@ -238,42 +238,9 @@ ConvertPageEntryAttribute (
+ 
+   CurrentPageEntry = *PageEntry;
+   NewPageEntry     = CurrentPageEntry;
+-  if ((Attributes & EFI_MEMORY_RP) != 0) {
+-    if (IsSet) {
+-      NewPageEntry &= ~(UINT64)IA32_PG_P;
+-    } else {
+-      NewPageEntry |= IA32_PG_P;
+-    }
+-  }
+-
+-  if ((Attributes & EFI_MEMORY_RO) != 0) {
+-    if (IsSet) {
+-      NewPageEntry &= ~(UINT64)IA32_PG_RW;
+-      if (mInternalCr3 != 0) {
+-        // Environment setup
+-        // ReadOnly page need set Dirty bit for shadow stack
+-        NewPageEntry |= IA32_PG_D;
+-        // Clear user bit for supervisor shadow stack
+-        NewPageEntry &= ~(UINT64)IA32_PG_U;
+-      } else {
+-        // Runtime update
+-        // Clear dirty bit for non shadow stack, to protect RO page.
+-        NewPageEntry &= ~(UINT64)IA32_PG_D;
+-      }
+-    } else {
+-      NewPageEntry |= IA32_PG_RW;
+-    }
+-  }
+-
+-  if ((Attributes & EFI_MEMORY_XP) != 0) {
+-    if (mXdSupported) {
+-      if (IsSet) {
+-        NewPageEntry |= IA32_PG_NX;
+-      } else {
+-        NewPageEntry &= ~IA32_PG_NX;
+-      }
+-    }
+-  }
++  NewPageEntry    |= IA32_PG_P;
++  NewPageEntry    |= IA32_PG_RW;
++  NewPageEntry    &= ~IA32_PG_NX;
+ 
+   *PageEntry = NewPageEntry;
+   if (CurrentPageEntry != NewPageEntry) {
+-- 
+2.35.1
+

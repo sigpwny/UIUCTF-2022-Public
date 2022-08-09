@@ -1,0 +1,24 @@
+name: "Library of Babel"
+author: "richyliu"
+category: rev
+description: |-
+  > By this art you may contemplate the variation of the 23 letters...
+
+  `$ nc library-of-babel.chal.uiuc.tf 1337`
+
+  **author**: richyliu, Husnain
+value: 500
+type: dynamic
+extra:
+  initial: 500
+  decay: 75
+  minimum: 50
+flags:
+  - uiuctf{th3_l18br4ry_1s_unlim1t3d_bu7_p3r10d1c_c9176412}
+tags:
+  - rev
+  - crypto
+files:
+  - challenge/library_of_babel
+state: visible
+version: "0.1"

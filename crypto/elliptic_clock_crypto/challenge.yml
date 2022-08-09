@@ -1,0 +1,21 @@
+name: "Elliptic Clock Crypto"
+author: "Husnain"
+category: crypto
+description: |-
+  I heard that ECC (which stands for Elliptic Clock Crypto, right?) is all the rage these days, so I implemented it myself and encrypted my flag with it. Unless I did something wrong, it should be impossible to get the flag back!
+
+  **author**: Husnain
+value: 500
+type: dynamic
+extra:
+  initial: 500
+  decay: 75
+  minimum: 50
+flags:
+  - uiuctf{Circle5_ar3_n0t_ell1ptic}
+tags:
+  - crypto
+files:
+  - ecc.py
+  - output.txt
+state: hidden

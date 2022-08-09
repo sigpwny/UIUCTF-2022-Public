@@ -1,0 +1,21 @@
+name: "asr"
+author: "david"
+category: crypto
+description: |-
+  Oh no I dropped my d. Good thing I'm not telling you my n.
+
+  **author**: zhengdw 
+value: 500
+type: dynamic
+extra:
+  initial: 500
+  decay: 75
+  minimum: 50
+flags:
+  - uiuctf{bru4e_f0rc3_1s_FUn_fuN_Fun_f0r_The_whOLe_F4miLY!}
+tags:
+  - crypto 
+files:
+  - chall.py
+state: visible
+version: "0.1"

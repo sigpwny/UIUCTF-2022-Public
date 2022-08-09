@@ -1,0 +1,17 @@
+apiVersion: kctf.dev/v1
+kind: Challenge
+metadata:
+  name: ar-pwny
+spec:
+  deployed: true
+  powDifficultySeconds: 0
+  network:
+    public: true
+    ports:
+      - protocol: "HTTPS"
+        targetPort: 1337
+  healthcheck:
+    # TIP: disable the healthcheck during development
+    enabled: true
+    image: us.gcr.io/dotted-forest-314903/ar-pwny-healthcheck:365d797fd2e06253590e7b9e72430238ed4109500fbcf4428870c28d20a822f5
+  image: us.gcr.io/dotted-forest-314903/ar-pwny-challenge:3483f5d88e62148e378632d5457393a6c2210297685a34f4e85af999b552138d

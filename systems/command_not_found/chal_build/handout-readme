@@ -1,0 +1,8 @@
+The VM you boot here will not execute the commands that are automatically
+sent to bash in a remote session. This means that you have a lot more commands
+to play with. However, the get_flag binary is not part of this build.
+
+An FTP server serving on "ftproot" serving port 2121 is not provided.
+We use pyftpdlib but the exact implementation should not be relevant.
+
+Due to reasons, the kernel build here requires a minimum of QEMU v6.2.0

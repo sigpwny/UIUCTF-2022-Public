@@ -1,0 +1,21 @@
+name: "no-syscalls-allowed.c"
+author: "kuilin"
+category: pwn
+description: |-
+  No syscalls, no problem
+
+  `$ nc no-syscalls-allowed.chal.uiuc.tf 1337`
+
+  **author**: kuilin
+value: 500
+type: dynamic
+extra:
+  initial: 500
+  decay: 75
+  minimum: 50
+flags:
+  - uiuctf{timing-is-everything}
+files:
+  - ./challenge/no_syscalls_allowed.c
+state: visible
+version: "0.1"

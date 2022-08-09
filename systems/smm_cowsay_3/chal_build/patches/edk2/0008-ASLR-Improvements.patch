@@ -1,0 +1,68 @@
+From 84d5511d755f8f34175f7f5a37db4df50379601d Mon Sep 17 00:00:00 2001
+From: YiFei Zhu <zhuyifei@google.com>
+Date: Wed, 30 Mar 2022 10:13:39 -0700
+Subject: [PATCH 8/8] ASLR Improvements
+
+- Allow runtime drivers to be shuffled too
+- Use rdrand for entropy because timer seems to take forever
+- Increase entropy bits from 4 to 10; don't brute force to defeat ASLR
+
+Signed-off-by: YiFei Zhu <zhuyifei@google.com>
+---
+ AslrPkg/AslrPkg.dec                           |  2 +-
+ MdeModulePkg/Core/Dxe/Dispatcher/Dispatcher.c | 15 +++++++++++++++
+ OvmfPkg/OvmfPkgX64.dsc                        |  2 +-
+ 3 files changed, 17 insertions(+), 2 deletions(-)
+
+diff --git a/AslrPkg/AslrPkg.dec b/AslrPkg/AslrPkg.dec
+index 62c3781325..1eaba67194 100644
+--- a/AslrPkg/AslrPkg.dec
++++ b/AslrPkg/AslrPkg.dec
+@@ -29,4 +29,4 @@
+ 
+ [PcdsFixedAtBuild, PcdsPatchableInModule]
+   ## This PCD control ASLR entropy bits.
+-  gEfiAslrPkgTokenSpaceGuid.PcdASLRMinimumEntropyBits|0x04|UINT8|0x00000001
++  gEfiAslrPkgTokenSpaceGuid.PcdASLRMinimumEntropyBits|0x0a|UINT8|0x00000001
+diff --git a/MdeModulePkg/Core/Dxe/Dispatcher/Dispatcher.c b/MdeModulePkg/Core/Dxe/Dispatcher/Dispatcher.c
+index afdac11a9f..61be090fd2 100644
+--- a/MdeModulePkg/Core/Dxe/Dispatcher/Dispatcher.c
++++ b/MdeModulePkg/Core/Dxe/Dispatcher/Dispatcher.c
+@@ -1281,6 +1281,21 @@ DxeCoreLoadImages(
+         );
+     }
+   }
++  ImageType = EFI_IMAGE_SUBSYSTEM_EFI_RUNTIME_DRIVER;
++  for (Index = 0; Index < Count; Index++) {
++    DriverEntry = AllDriverEntries[Index];
++    if (DriverEntry->ImageHandle == NULL && !DriverEntry->IsFvImage) {
++      CoreLoadImageWithType(
++        FALSE,
++        gDxeCoreImageHandle,
++        DriverEntry->FvFileDevicePath,
++        NULL,
++        0,
++        &DriverEntry->ImageHandle,
++        &ImageType
++        );
++    }
++  }
+ 
+   //
+   // Destroy cache
+diff --git a/OvmfPkg/OvmfPkgX64.dsc b/OvmfPkg/OvmfPkgX64.dsc
+index 48f8da03f2..6022e95d11 100644
+--- a/OvmfPkg/OvmfPkgX64.dsc
++++ b/OvmfPkg/OvmfPkgX64.dsc
+@@ -221,7 +221,7 @@
+ !else
+   OpensslLib|CryptoPkg/Library/OpensslLib/OpensslLibCrypto.inf
+ !endif
+-  RngLib|MdePkg/Library/BaseRngLibTimerLib/BaseRngLibTimerLib.inf
++  RngLib|MdePkg/Library/BaseRngLib/BaseRngLib.inf
+ 
+ !if $(SECURE_BOOT_ENABLE) == TRUE
+   PlatformSecureLib|OvmfPkg/Library/PlatformSecureLib/PlatformSecureLib.inf
+-- 
+2.35.1
+

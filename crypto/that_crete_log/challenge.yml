@@ -1,0 +1,23 @@
+name: "That-crete Log"
+author: "zhengdw, Spamakin"
+category: crypto
+description: |-
+  Everyone knows Fermat couldn't come up with a way to test for primes. Fortunately these two other people came up with a secure way.
+
+  `$ nc log.chal.uiuc.tf 1337`
+
+  **authors:** zhengdw, Spamakin
+value: 500
+type: dynamic
+extra:
+  initial: 500
+  decay: 75
+  minimum: 50
+flags:
+  - uiuctf{w0w_1_th0ughT_Th4t_discr3te_L0g_w4s_h4rD_f04_s4f3_prim2s!1!_d91ea3cf4a3daaf0604520}
+tags:
+  - crypto
+  - extreme
+files:
+    - challenge/server.py
+state: hidden

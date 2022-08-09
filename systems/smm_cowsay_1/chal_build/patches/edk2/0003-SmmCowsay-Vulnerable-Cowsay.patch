@@ -1,0 +1,308 @@
+From 661b3ef675d6aacca4dff716a950e2a5ad1cb2bb Mon Sep 17 00:00:00 2001
+From: YiFei Zhu <zhuyifei@google.com>
+Date: Mon, 28 Mar 2022 17:52:45 -0700
+Subject: [PATCH 3/5] SmmCowsay: Vulnerable Cowsay
+
+Signed-off-by: YiFei Zhu <zhuyifei@google.com>
+---
+ MdeModulePkg/MdeModulePkg.dec   |   2 +
+ OvmfPkg/OvmfPkgX64.dsc          |   4 +-
+ OvmfPkg/OvmfPkgX64.fdf          |   2 +
+ OvmfPkg/SmmCowsay/SmmCowsay.c   | 194 ++++++++++++++++++++++++++++++++
+ OvmfPkg/SmmCowsay/SmmCowsay.inf |  38 +++++++
+ 5 files changed, 239 insertions(+), 1 deletion(-)
+ create mode 100644 OvmfPkg/SmmCowsay/SmmCowsay.c
+ create mode 100644 OvmfPkg/SmmCowsay/SmmCowsay.inf
+
+diff --git a/MdeModulePkg/MdeModulePkg.dec b/MdeModulePkg/MdeModulePkg.dec
+index 2bcb9f9453..36dbb639f1 100644
+--- a/MdeModulePkg/MdeModulePkg.dec
++++ b/MdeModulePkg/MdeModulePkg.dec
+@@ -436,6 +436,8 @@
+   ## GUID used for Boot Discovery Policy FormSet guid and related variables.
+   gBootDiscoveryPolicyMgrFormsetGuid = { 0x5b6f7107, 0xbb3c, 0x4660, { 0x92, 0xcd, 0x54, 0x26, 0x90, 0x28, 0x0b, 0xbd } }
+ 
++  gEfiSmmCowsayCommunicationGuid = { 0x9a75cf12, 0x2c83, 0x4d10, { 0xb5, 0xa8, 0x35, 0x75, 0x54, 0x65, 0x92, 0xf7 } }
++
+ [Ppis]
+   ## Include/Ppi/AtaController.h
+   gPeiAtaControllerPpiGuid       = { 0xa45e60d1, 0xc719, 0x44aa, { 0xb0, 0x7a, 0xaa, 0x77, 0x7f, 0x85, 0x90, 0x6d }}
+diff --git a/OvmfPkg/OvmfPkgX64.dsc b/OvmfPkg/OvmfPkgX64.dsc
+index 1448f925b7..34e3803524 100644
+--- a/OvmfPkg/OvmfPkgX64.dsc
++++ b/OvmfPkg/OvmfPkgX64.dsc
+@@ -30,7 +30,7 @@
+   # -D FLAG=VALUE
+   #
+   DEFINE SECURE_BOOT_ENABLE      = FALSE
+-  DEFINE SMM_REQUIRE             = FALSE
++  DEFINE SMM_REQUIRE             = TRUE
+   DEFINE SOURCE_DEBUG_ENABLE     = FALSE
+ 
+ !include OvmfPkg/OvmfTpmDefines.dsc.inc
+@@ -1092,3 +1092,5 @@
+   # TPM support
+   #
+ !include OvmfPkg/OvmfTpmComponentsDxe.dsc.inc
++
++  OvmfPkg/SmmCowsay/SmmCowsay.inf
+diff --git a/OvmfPkg/OvmfPkgX64.fdf b/OvmfPkg/OvmfPkgX64.fdf
+index 438806fba8..26cc2d0545 100644
+--- a/OvmfPkg/OvmfPkgX64.fdf
++++ b/OvmfPkg/OvmfPkgX64.fdf
+@@ -405,6 +405,8 @@ INF  MdeModulePkg/Universal/Variable/RuntimeDxe/VariableRuntimeDxe.inf
+ #
+ !include OvmfPkg/OvmfTpmDxe.fdf.inc
+ 
++INF  OvmfPkg/SmmCowsay/SmmCowsay.inf
++
+ ################################################################################
+ 
+ [FV.FVMAIN_COMPACT]
+diff --git a/OvmfPkg/SmmCowsay/SmmCowsay.c b/OvmfPkg/SmmCowsay/SmmCowsay.c
+new file mode 100644
+index 0000000000..d7035d8727
+--- /dev/null
++++ b/OvmfPkg/SmmCowsay/SmmCowsay.c
+@@ -0,0 +1,194 @@
++#include <Library/BaseLib.h>
++#include <Library/BaseMemoryLib.h>
++#include <Library/DebugLib.h>
++#include <Library/MemoryAllocationLib.h>
++#include <Library/PcdLib.h>
++#include <Library/PrintLib.h>
++#include <Library/SerialPortLib.h>
++#include <Library/SmmMemLib.h>
++#include <Library/SmmServicesTableLib.h>
++#include <Library/UefiDriverEntryPoint.h>
++
++extern EFI_GUID gEfiSmmCowsayCommunicationGuid;
++
++UINTN
++SmmInternalPrint (
++  IN  CONST CHAR16 *Format,
++  IN  VA_LIST Marker
++  )
++{
++  UINTN Return;
++  CHAR16 *Buffer;
++  UINTN BufferSize;
++
++  ASSERT (Format != NULL);
++  ASSERT (((UINTN) Format & BIT0) == 0);
++
++  BufferSize = (PcdGet32(PcdUefiLibMaxPrintBufferSize) + 1) * sizeof(CHAR16);
++
++  Buffer = AllocatePool(BufferSize);
++  ASSERT (Buffer != NULL);
++
++  Return = UnicodeVSPrint(Buffer, BufferSize, Format, Marker);
++
++  if (Return > 0) {
++    for (CHAR16 *Ptr = Buffer; *Ptr; Ptr++) {
++      UINT8 Ascii = *Ptr;
++      SerialPortWrite(&Ascii, 1);
++    }
++  }
++
++  FreePool (Buffer);
++
++  return Return;
++}
++
++UINTN
++EFIAPI
++SmmPrint (
++  IN CONST CHAR16  *Format,
++  ...
++  )
++{
++  VA_LIST Marker;
++  UINTN   Return;
++
++  VA_START (Marker, Format);
++
++  Return = SmmInternalPrint (Format, Marker);
++
++  VA_END (Marker);
++
++  return Return;
++}
++
++VOID
++EFIAPI
++Cowsay (
++  IN CONST CHAR16 *Message
++  )
++{
++  UINTN Rows, Cols, CurRow, CurCol;
++  CHAR16 PrintChr[2] = {0};
++  CONST CHAR16 *Ptr;
++
++  Rows = Cols = CurRow = CurCol = 0;
++
++  for (Ptr = Message; *Ptr; Ptr++) {
++    if (CurCol == 0)
++      Rows++;
++
++    if (*Ptr == '\n') {
++      CurCol = 0;
++      continue;
++    }
++
++    CurCol++;
++    if (CurCol > Cols)
++      Cols = CurCol;
++  }
++
++  if (Rows == 0)
++    goto cow;
++
++  SmmPrint(L" _");
++
++  for (UINTN i = 0; i < Cols; i++)
++    SmmPrint(L"_");
++
++  SmmPrint(L"_ \n");
++
++  CurCol = 0;
++  for (Ptr = Message; *Ptr; Ptr++) {
++    if (CurCol == 0) {
++      CurRow++;
++
++      if (Rows == 1)
++        SmmPrint(L"< ");
++      else if (CurRow == 1)
++        SmmPrint(L"/ ");
++      else if (CurRow == Rows)
++        SmmPrint(L"\\ ");
++      else
++        SmmPrint(L"| ");
++    }
++
++    if (*Ptr == '\n') {
++      for (UINTN i = 0; i < Cols - CurCol; i++)
++        SmmPrint(L" ");
++
++      if (Rows == 1)
++        SmmPrint(L" >\n");
++      else if (CurRow == 1)
++        SmmPrint(L" \\\n");
++      else if (CurRow == Rows)
++        SmmPrint(L" /\n");
++      else
++        SmmPrint(L" |\n");
++
++      CurCol = 0;
++      continue;
++    }
++
++    CurCol++;
++
++    PrintChr[0] = *Ptr;
++    SmmPrint(PrintChr);
++  }
++
++  SmmPrint(L" -");
++
++  for (UINTN i = 0; i < Cols; i++)
++    SmmPrint(L"-");
++
++  SmmPrint(L"- \n");
++
++cow:
++  SmmPrint(L"\
++          \\   ^__^\n\
++           \\  (oo)\\_______\n\
++              (__)\\       )\\/\\\n\
++                  ||----w |\n\
++                  ||     ||\n");
++}
++
++EFI_STATUS
++EFIAPI
++SmmCowsayHandler (
++  IN EFI_HANDLE  DispatchHandle,
++  IN CONST VOID  *Context         OPTIONAL,
++  IN OUT VOID    *CommBuffer      OPTIONAL,
++  IN OUT UINTN   *CommBufferSize  OPTIONAL
++  )
++{
++  DEBUG ((DEBUG_INFO, "SmmCowsay SmmCowsayHandler Enter\n"));
++
++  if (!CommBuffer || !CommBufferSize || *CommBufferSize < sizeof(CHAR16 *))
++    return EFI_SUCCESS;
++
++  Cowsay(*(CONST CHAR16 **)CommBuffer);
++
++  DEBUG ((DEBUG_INFO, "SmmCowsay SmmCowsayHandler Exit\n"));
++
++  return EFI_SUCCESS;
++}
++
++EFI_STATUS
++EFIAPI
++SmmCowsayInit (
++  IN EFI_HANDLE ImageHandle,
++  IN EFI_SYSTEM_TABLE *SystemTable
++  )
++{
++  EFI_STATUS Status;
++  EFI_HANDLE DispatchHandle;
++
++  Status = gSmst->SmiHandlerRegister (
++                    SmmCowsayHandler,
++                    &gEfiSmmCowsayCommunicationGuid,
++                    &DispatchHandle
++                    );
++  ASSERT_EFI_ERROR (Status);
++
++  return Status;
++}
+diff --git a/OvmfPkg/SmmCowsay/SmmCowsay.inf b/OvmfPkg/SmmCowsay/SmmCowsay.inf
+new file mode 100644
+index 0000000000..be0aeb9eec
+--- /dev/null
++++ b/OvmfPkg/SmmCowsay/SmmCowsay.inf
+@@ -0,0 +1,38 @@
++[Defines]
++  INF_VERSION                    = 0x00010005
++  BASE_NAME                      = SmmCowsay
++  FILE_GUID                      = A7DE70E0-918E-4DFE-BFFB-AD860A376E65
++  MODULE_TYPE                    = DXE_SMM_DRIVER
++  VERSION_STRING                 = 1.0
++  PI_SPECIFICATION_VERSION       = 0x0001000A
++  ENTRY_POINT                    = SmmCowsayInit
++
++[Sources]
++  SmmCowsay.c
++
++[Packages]
++  MdePkg/MdePkg.dec
++  MdeModulePkg/MdeModulePkg.dec
++
++[LibraryClasses]
++  BaseLib
++  BaseMemoryLib
++  DebugLib
++  MemoryAllocationLib
++  PcdLib
++  PrintLib
++  SerialPortLib
++  SmmMemLib
++  SmmServicesTableLib
++  UefiDriverEntryPoint
++
++[Guids]
++  ## PRODUCES ## GUID # SmiHandlerRegister
++  gEfiSmmCowsayCommunicationGuid
++
++[Pcd]
++  gEfiMdeModulePkgTokenSpaceGuid.PcdSerialRegisterBase  ## SOMETIMES_CONSUMES
++  gEfiMdePkgTokenSpaceGuid.PcdUefiLibMaxPrintBufferSize  ## SOMETIMES_CONSUMES
++
++[Depex]
++  TRUE
+-- 
+2.35.1
+

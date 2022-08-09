@@ -1,0 +1,21 @@
+name: "CPSC"
+author: "richyliu"
+category: rev
+description: |-
+  Love Haskell? Ocaml? Then you'll love this.
+
+  **author**: richyliu, Surg
+value: 500
+type: dynamic
+extra:
+  initial: 500
+  decay: 75
+  minimum: 50
+flags:
+  - uiuctf{n41tv3_func7iona1_pr0gr4mm1ng_1n_C!}
+tags:
+  - rev
+files:
+  - challenge/cpsc
+state: visible
+version: "0.1"

@@ -1,0 +1,22 @@
+# This file represents the base specification of your challenge. It is used by
+# other tools to install and deploy your challenge.
+# Required sections
+name: "Join our Discord"
+author: N/A
+category: misc
+description: |-
+  Join the UIUCTF Discord channel! <a href="https://discord.gg/PytGqjq">https://discord.gg/PytGqjq</a>
+
+value: 1
+type: standard
+tags:
+  - beginner
+# extra:
+#   initial: 500
+#   decay: 75
+#   minimum: 50
+flags:
+  - uiuctf{scinkey_chackinty}
+# This is visible by default. It takes two values: hidden, visible.
+state: hidden
+version: "0.1"

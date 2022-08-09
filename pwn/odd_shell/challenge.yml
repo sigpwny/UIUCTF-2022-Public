@@ -1,0 +1,24 @@
+name: "odd shell"
+author: "surg"
+category: pwn
+description: |-
+  O ho! You found me! I have a display of oddities available to you!
+
+  `$ nc odd-shell.chal.uiuc.tf 1337`
+
+  **author**: Surg
+value: 500
+type: dynamic
+extra:
+  initial: 500
+  decay: 75
+  minimum: 50
+flags:
+  - uiuctf{5uch_0dd_by4t3s_1n_my_r3g1st3rs!}
+tags:
+  - pwn
+  - shellcode
+files:
+  - challenge/chal
+state: visible
+version: "0.1"

@@ -1,0 +1,42 @@
+name: "Command Not Found"
+author: "YiFei Zhu"
+category: systems
+description: |-
+  You went AFK for a few moments and forgot to lock your laptop.
+  When you came back you discovered your archnemesis ran the
+  unspeakable command. You forgot to take a backup, and you don't
+  have a bootable USB lying around. You look through the scrollback
+  buffer and notice a copy command is probably still running.
+  Maybe, just maybe, you can restore a few files...
+
+  Disclaimer: This story is fictitious; no identification with
+  actual persons and places is intended or should be inferred.
+  No person or computers were harmed during the production of
+  this challenge. Do not attempt running the unspeakable command
+  in the real world.
+
+  **If you enter the unspeakable command to the provided VM, triple
+  check you have entered into the correct terminal.**
+
+  Note: The flag is not on the hard disk. Carving for the flag will
+  not work.
+
+  `$ stty raw -echo isig; nc command-not-found.chal.uiuc.tf 1337`
+
+  **author**: YiFei Zhu
+value: 500
+type: dynamic
+extra:
+  initial: 500
+  decay: 75
+  minimum: 50
+flags:
+  - uiuctf{what_could_possibly_go_wrong_be6e0fbe}
+tags:
+  - systems
+  - rm-rf
+  - no-preserve-root
+files:
+  - challenge/handout.tar.zst
+state: visible
+version: "0.1"

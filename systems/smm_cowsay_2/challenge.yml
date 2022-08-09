@@ -1,0 +1,25 @@
+name: "SMM Cowsay 2"
+author: "YiFei Zhu"
+category: systems
+description: |-
+  We asked that engineer to fix the issue, but I think he may have left a
+  backdoor disguised as debugging code.
+
+  `$ stty raw -echo isig; nc smm-cowsay-2.chal.uiuc.tf 1337`
+
+  **author**: YiFei Zhu
+value: 500
+type: dynamic
+extra:
+  initial: 500
+  decay: 75
+  minimum: 50
+flags:
+  - uiuctf{dont_try_this_at_home_I_mean_at_work_5dfbf3eb}
+tags:
+  - systems
+  - smm
+files:
+  - challenge/handout.tar.zst
+state: visible
+version: "0.1"

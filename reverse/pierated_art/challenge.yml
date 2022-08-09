@@ -1,0 +1,22 @@
+name: 'Pierated Art'
+author: 'spicypete'
+category: rev
+description: |-
+  Downloaded some art from a sketchy torrent provider (piet_pirate), and there are scribbles all over it.
+
+  **Challenge sponsored by Battelle**
+
+  `$ nc pierated-art.chal.uiuc.tf 1337`
+
+  **author:** spicypete, richyliu
+value: 500
+type: dynamic
+extra:
+  initial: 500
+  decay: 75
+  minimum: 50
+flags:
+  - uiuctf{m0ndr14n_b3st_pr0gr4mm3r_ngl}
+tags:
+  - rev
+state: hidden

@@ -1,0 +1,29 @@
+# This file represents the base specification of your challenge. It is used by
+# other tools to install and deploy your challenge.
+# Required sections
+name: safepy
+author: tow_nater
+category: jail
+description: |-
+  My calculator won't be getting pwned again...
+
+  `$ nc safepy.chal.uiuc.tf 1337`
+
+  **author**: tow_nater
+value: 500
+type: dynamic
+tags:
+  - jail
+  - python
+  - beginner
+extra:
+  initial: 500
+  decay: 75
+  minimum: 50
+files:
+  - handout.tar.gz
+flags:
+  - uiuctf{na1v3_0r_mal1ci0u5_chang3?} 
+# This is visible by default. It takes two values: hidden, visible.
+state: visible
+version: "0.1"

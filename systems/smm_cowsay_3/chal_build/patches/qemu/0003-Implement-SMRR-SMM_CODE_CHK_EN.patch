@@ -1,0 +1,307 @@
+From 45108b655aa88bc0fc07b429b0b8530f420bd67c Mon Sep 17 00:00:00 2001
+From: YiFei Zhu <zhuyifei@google.com>
+Date: Fri, 24 Jun 2022 20:50:25 -0700
+Subject: [PATCH 3/3] Implement SMRR & SMM_CODE_CHK_EN
+
+The protecting SMRAM from non-SMM feature of SMRR is not implemented.
+QEMU doesn't seem to have the cache problem and since it uses a
+different address space I think this is fine.
+
+Signed-off-by: YiFei Zhu <zhuyifei@google.com>
+---
+ target/i386/cpu.c                    |  5 +++
+ target/i386/cpu.h                    | 17 +++++++++
+ target/i386/tcg/sysemu/excp_helper.c | 56 ++++++++++++++++++++++------
+ target/i386/tcg/sysemu/misc_helper.c | 48 +++++++++++++++++++++++-
+ 4 files changed, 114 insertions(+), 12 deletions(-)
+
+diff --git a/target/i386/cpu.c b/target/i386/cpu.c
+index cb6b5467d0..7072c3bddd 100644
+--- a/target/i386/cpu.c
++++ b/target/i386/cpu.c
+@@ -5990,6 +5990,11 @@ static void x86_cpu_reset(DeviceState *dev)
+     env->mtrr_deftype = 0;
+     memset(env->mtrr_var, 0, sizeof(env->mtrr_var));
+     memset(env->mtrr_fixed, 0, sizeof(env->mtrr_fixed));
++    env->smrr.base = 0;
++    env->smrr.mask = 0;
++
++    env->smm_feat_ctrl_locked = false;
++    env->smm_code_chk_en = false;
+ 
+     env->interrupt_injected = -1;
+     env->exception_nr = -1;
+diff --git a/target/i386/cpu.h b/target/i386/cpu.h
+index 982c532353..d3de15698b 100644
+--- a/target/i386/cpu.h
++++ b/target/i386/cpu.h
+@@ -411,6 +411,7 @@ typedef enum X86Seg {
+ #define MSR_MTRRcap_VCNT                8
+ #define MSR_MTRRcap_FIXRANGE_SUPPORT    (1 << 8)
+ #define MSR_MTRRcap_WC_SUPPORTED        (1 << 10)
++#define MSR_MTRRcap_SMRR_SUPPORTED      (1 << 11)
+ 
+ #define MSR_IA32_SYSENTER_CS            0x174
+ #define MSR_IA32_SYSENTER_ESP           0x175
+@@ -421,6 +422,9 @@ typedef enum X86Seg {
+ #define MSR_MCG_CTL                     0x17b
+ #define MSR_MCG_EXT_CTL                 0x4d0
+ 
++#define MSR_SMM_MCA_CAP                 0x17d
++#define MSR_SMM_MCA_CAP_CODE_CHK        (1ULL << 58)
++
+ #define MSR_P6_EVNTSEL0                 0x186
+ 
+ #define MSR_IA32_PERF_STATUS            0x198
+@@ -430,6 +434,9 @@ typedef enum X86Seg {
+ #define MSR_IA32_MISC_ENABLE_DEFAULT    1
+ #define MSR_IA32_MISC_ENABLE_MWAIT      (1ULL << 18)
+ 
++#define MSR_IA32_SMRR_PHYSBASE          0x1f2
++#define MSR_IA32_SMRR_PHYSMASK          0x1f3
++
+ #define MSR_MTRRphysBase(reg)           (0x200 + 2 * (reg))
+ #define MSR_MTRRphysMask(reg)           (0x200 + 2 * (reg) + 1)
+ 
+@@ -464,6 +471,10 @@ typedef enum X86Seg {
+ #define MSR_MC0_ADDR                    0x402
+ #define MSR_MC0_MISC                    0x403
+ 
++#define MSR_SMM_FEATURE_CONTROL         0x4e0
++#define MSR_SMM_FEAT_CTRL_LOCK          (1 << 0)
++#define MSR_SMM_FEAT_CTRL_CODE_CHK_EN   (1 << 2)
++
+ #define MSR_IA32_RTIT_OUTPUT_BASE       0x560
+ #define MSR_IA32_RTIT_OUTPUT_MASK       0x561
+ #define MSR_IA32_RTIT_CTL               0x570
+@@ -1691,6 +1702,12 @@ typedef struct CPUArchState {
+     uint64_t mtrr_deftype;
+     MTRRVar mtrr_var[MSR_MTRRcap_VCNT];
+ 
++    MTRRVar smrr;
++
++    /* SMM Feature Control */
++    bool smm_feat_ctrl_locked;
++    bool smm_code_chk_en;
++
+     /* For KVM */
+     uint32_t mp_state;
+     int32_t exception_nr;
+diff --git a/target/i386/tcg/sysemu/excp_helper.c b/target/i386/tcg/sysemu/excp_helper.c
+index e1b6d88683..10b5fbf466 100644
+--- a/target/i386/tcg/sysemu/excp_helper.c
++++ b/target/i386/tcg/sysemu/excp_helper.c
+@@ -20,6 +20,8 @@
+ #include "qemu/osdep.h"
+ #include "cpu.h"
+ #include "exec/exec-all.h"
++#include "exec/log.h"
++#include "sysemu/runstate.h"
+ #include "tcg/helper-tcg.h"
+ 
+ #define PG_ERROR_OK (-1)
+@@ -31,7 +33,7 @@ typedef hwaddr (*MMUTranslateFunc)(CPUState *cs, hwaddr gphys, MMUAccessType acc
+ 	(get_hphys_func ? get_hphys_func(cs, gpa, access_type, prot) : gpa)
+ 
+ static int mmu_translate(CPUState *cs, hwaddr addr, MMUTranslateFunc get_hphys_func,
+-                         uint64_t cr3, int is_write1, int mmu_idx, int pg_mode,
++                         uint64_t cr3, MMUAccessType access_type, int mmu_idx, int pg_mode,
+                          hwaddr *xlat, int *page_size, int *prot)
+ {
+     X86CPU *cpu = X86_CPU(cs);
+@@ -46,7 +48,7 @@ static int mmu_translate(CPUState *cs, hwaddr addr, MMUTranslateFunc get_hphys_f
+     uint32_t pkr;
+ 
+     is_user = (mmu_idx == MMU_USER_IDX);
+-    is_write = is_write1 & 1;
++    is_write = access_type == MMU_DATA_STORE;
+     a20_mask = x86_get_a20_mask(env);
+ 
+     if (!(pg_mode & PG_MODE_NXE)) {
+@@ -264,14 +266,14 @@ do_check_protect_pse36:
+         }
+ 
+         *prot &= pkr_prot;
+-        if ((pkr_prot & (1 << is_write1)) == 0) {
+-            assert(is_write1 != 2);
++        if ((pkr_prot & (1 << access_type)) == 0) {
++            assert(access_type != MMU_INST_FETCH);
+             error_code |= PG_ERROR_PK_MASK;
+             goto do_fault_protect;
+         }
+     }
+ 
+-    if ((*prot & (1 << is_write1)) == 0) {
++    if ((*prot & (1 << access_type)) == 0) {
+         goto do_fault_protect;
+     }
+ 
+@@ -297,7 +299,7 @@ do_check_protect_pse36:
+     /* align to page_size */
+     pte &= PG_ADDRESS_MASK & ~(*page_size - 1);
+     page_offset = addr & (*page_size - 1);
+-    *xlat = GET_HPHYS(cs, pte + page_offset, is_write1, prot);
++    *xlat = GET_HPHYS(cs, pte + page_offset, access_type, prot);
+     return PG_ERROR_OK;
+ 
+  do_fault_rsvd:
+@@ -308,7 +310,7 @@ do_check_protect_pse36:
+     error_code |= (is_write << PG_ERROR_W_BIT);
+     if (is_user)
+         error_code |= PG_ERROR_U_MASK;
+-    if (is_write1 == 2 &&
++    if (access_type == MMU_INST_FETCH &&
+         ((pg_mode & PG_MODE_NXE) || (pg_mode & PG_MODE_SMEP)))
+         error_code |= PG_ERROR_I_D_MASK;
+     return error_code;
+@@ -353,7 +355,7 @@ hwaddr get_hphys(CPUState *cs, hwaddr gphys, MMUAccessType access_type,
+  * 1  = generate PF fault
+  */
+ static int handle_mmu_fault(CPUState *cs, vaddr addr, int size,
+-                            int is_write1, int mmu_idx)
++                            MMUAccessType access_type, int mmu_idx)
+ {
+     X86CPU *cpu = X86_CPU(cs);
+     CPUX86State *env = &cpu->env;
+@@ -364,7 +366,7 @@ static int handle_mmu_fault(CPUState *cs, vaddr addr, int size,
+ 
+ #if defined(DEBUG_MMU)
+     printf("MMU fault: addr=%" VADDR_PRIx " w=%d mmu=%d eip=" TARGET_FMT_lx "\n",
+-           addr, is_write1, mmu_idx, env->eip);
++           addr, access_type, mmu_idx, env->eip);
+ #endif
+ 
+     if (!(env->cr[0] & CR0_PG_MASK)) {
+@@ -391,7 +393,7 @@ static int handle_mmu_fault(CPUState *cs, vaddr addr, int size,
+             }
+         }
+ 
+-        error_code = mmu_translate(cs, addr, get_hphys, env->cr[3], is_write1,
++        error_code = mmu_translate(cs, addr, get_hphys, env->cr[3], access_type,
+                                    mmu_idx, pg_mode,
+                                    &paddr, &page_size, &prot);
+     }
+@@ -402,7 +404,39 @@ static int handle_mmu_fault(CPUState *cs, vaddr addr, int size,
+         vaddr = addr & TARGET_PAGE_MASK;
+         paddr &= TARGET_PAGE_MASK;
+ 
+-        assert(prot & (1 << is_write1));
++        /* SMM_CODE_CHK_EN */
++        if (env->smm_code_chk_en && (env->hflags & HF_SMM_MASK)) {
++            if ((paddr & ((env->smrr.mask & 0xfffff000) | ~0xffffffffULL)) !=
++                    (env->smrr.base & env->smrr.mask & 0xfffff000)) {
++                prot &= ~PAGE_EXEC;
++
++                if (access_type == MMU_INST_FETCH) {
++/* I'm not raising a MCE into software handler, so you can see the CPU state
++   dump immediately at the time of the MCE. Hopefully this will make the chal
++   less tedious. You're welcome. */
++#if 0
++                    if (!(env->mcg_status & MCG_STATUS_MCIP) && env->cr[4] & CR4_MCE_MASK) {
++                        env->mce_banks[1] = env->mce_banks[1] & MCI_STATUS_VAL ?
++                            MCI_STATUS_OVER : 0;
++                        env->mce_banks[1] |= MCI_STATUS_VAL | MCI_STATUS_UC |
++                            MCI_STATUS_EN | MCI_STATUS_PCC;
++                        env->mcg_status = MCG_STATUS_MCIP | MCG_STATUS_LMCE;
++                        raise_exception(env, EXCP12_MCHK);
++                    }
++#endif
++                    if (qemu_loglevel_mask(CPU_LOG_RESET)) {
++                        CPUClass *cc = CPU_GET_CLASS(cpu);
++
++                        qemu_log("Unrecoverable MCE from SMM_CODE_CHK_EN\n");
++                        log_cpu_state(CPU(cpu), cc->reset_dump_flags);
++                    }
++                    qemu_system_reset_request(SHUTDOWN_CAUSE_GUEST_RESET);
++                    cpu_loop_exit(cs);
++                }
++            }
++        }
++
++        assert(prot & (1 << access_type));
+         tlb_set_page_with_attrs(cs, vaddr, paddr, cpu_get_mem_attrs(env),
+                                 prot, mmu_idx, page_size);
+         return 0;
+diff --git a/target/i386/tcg/sysemu/misc_helper.c b/target/i386/tcg/sysemu/misc_helper.c
+index 3715c1e262..99d9c6b381 100644
+--- a/target/i386/tcg/sysemu/misc_helper.c
++++ b/target/i386/tcg/sysemu/misc_helper.c
+@@ -223,6 +223,30 @@ void helper_wrmsr(CPUX86State *env)
+         env->kernelgsbase = val;
+         break;
+ #endif
++    case MSR_SMM_FEATURE_CONTROL:
++        if (!(env->hflags & HF_SMM_MASK))
++            goto error;
++        if (env->smm_feat_ctrl_locked)
++            break;
++
++        env->smm_feat_ctrl_locked = val & MSR_SMM_FEAT_CTRL_LOCK;
++        env->smm_code_chk_en = val & MSR_SMM_FEAT_CTRL_CODE_CHK_EN;
++        tlb_flush(cs);
++        break;
++    case MSR_IA32_SMRR_PHYSBASE:
++        if (!(env->hflags & HF_SMM_MASK))
++            goto error;
++
++        env->smrr.base = val;
++        tlb_flush(cs);
++        break;
++    case MSR_IA32_SMRR_PHYSMASK:
++        if (!(env->hflags & HF_SMM_MASK))
++            goto error;
++
++        env->smrr.mask = val;
++        tlb_flush(cs);
++        break;
+     case MSR_MTRRphysBase(0):
+     case MSR_MTRRphysBase(1):
+     case MSR_MTRRphysBase(2):
+@@ -375,6 +399,25 @@ void helper_rdmsr(CPUX86State *env)
+     case MSR_SMI_COUNT:
+         val = env->msr_smi_count;
+         break;
++    case MSR_SMM_MCA_CAP:
++        if (!(env->hflags & HF_SMM_MASK))
++            goto error;
++
++        val = MSR_SMM_MCA_CAP_CODE_CHK;
++        break;
++    case MSR_SMM_FEATURE_CONTROL:
++        if (!(env->hflags & HF_SMM_MASK))
++            goto error;
++
++        val = (env->smm_feat_ctrl_locked ? MSR_SMM_FEAT_CTRL_LOCK : 0) +
++              (env->smm_code_chk_en ? MSR_SMM_FEAT_CTRL_CODE_CHK_EN : 0);
++        break;
++    case MSR_IA32_SMRR_PHYSBASE:
++        val = env->smrr.base;
++        break;
++    case MSR_IA32_SMRR_PHYSMASK:
++        val = env->smrr.mask;
++        break;
+     case MSR_MTRRphysBase(0):
+     case MSR_MTRRphysBase(1):
+     case MSR_MTRRphysBase(2):
+@@ -422,7 +465,7 @@ void helper_rdmsr(CPUX86State *env)
+     case MSR_MTRRcap:
+         if (env->features[FEAT_1_EDX] & CPUID_MTRR) {
+             val = MSR_MTRRcap_VCNT | MSR_MTRRcap_FIXRANGE_SUPPORT |
+-                MSR_MTRRcap_WC_SUPPORTED;
++                MSR_MTRRcap_WC_SUPPORTED | MSR_MTRRcap_SMRR_SUPPORTED;
+         } else {
+             /* XXX: exception? */
+             val = 0;
+@@ -464,6 +507,9 @@ void helper_rdmsr(CPUX86State *env)
+     }
+     env->regs[R_EAX] = (uint32_t)(val);
+     env->regs[R_EDX] = (uint32_t)(val >> 32);
++    return;
++error:
++    raise_exception_err_ra(env, EXCP0D_GPF, 0, GETPC());
+ }
+ 
+ void helper_flush_page(CPUX86State *env, target_ulong addr)
+-- 
+2.35.1
+

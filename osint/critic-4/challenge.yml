@@ -1,0 +1,22 @@
+name: "Everyone's A Critic 4"
+author: "Thomas"
+category: osint
+description: "There is a video game reviews content creator who has somehow ended up reviewing UIUCTF, make sure their reviews are not too harsh by investigating them!. Chuck has a Twitter account; can you find it and expose it for its hypocricy?!"
+value: 500
+type: dynamic
+extra:
+  initial: 500
+  decay: 75
+  minimum: 50
+flags:
+    - uicutf{scre@m1ng_@nD_crY1ng_b3cau5e_0n_twitter}
+tags:
+    - osint
+    - twitter
+hints:
+    - The first two characters of the flag after uiuctf{ are `sc`
+state: hidden
+
+# Specifies what version of the challenge specification was used.
+# Subject to change until ctfcli v1.0.0
+version: "0.1"

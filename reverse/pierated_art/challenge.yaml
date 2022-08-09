@@ -1,0 +1,18 @@
+apiVersion: kctf.dev/v1
+kind: Challenge
+metadata:
+  name: pierated-art
+spec:
+  deployed: true
+  powDifficultySeconds: 0
+  network:
+    public: true
+    ports:
+      - protocol: 'TCP'
+        port: 1337
+        targetPort: 1337
+  healthcheck:
+    # TIP: disable the healthcheck during development
+    enabled: true
+    image: us.gcr.io/dotted-forest-314903/pierated-art-healthcheck:55adac83164aa6115093e81bb626f2e5b2ca2657c6d05b321c4c4338d3c1897f
+  image: us.gcr.io/dotted-forest-314903/pierated-art-challenge:0d2642be561246a22e15e2329b24fffb3999bc30910dd5b105c129ff8e80a7ca

@@ -1,0 +1,27 @@
+name: woeby
+author: arxenix
+category: web
+description: |-
+  this retro search engine has retro bugs!
+
+  instancer: https://woeby.chal.uiuc.tf
+
+  **author**: arxenix
+value: 500
+type: dynamic
+extra:
+  initial: 500
+  decay: 75
+  minimum: 50
+hints:
+  - running the docker container will help you debug. get the solution working locally first.
+  - the flag has two parts, the second half is probably easier
+  - contact modmail with your progress and we may be able to provide guidance for this challenge
+flags:
+  - uiuctf{cec1e609cef0e05add463c52}
+tags:
+  - web
+files:
+  - handout.tar.gz
+state: visible
+version: "0.1"

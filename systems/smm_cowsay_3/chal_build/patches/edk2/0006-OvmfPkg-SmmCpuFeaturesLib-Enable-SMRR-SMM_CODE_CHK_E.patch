@@ -1,0 +1,201 @@
+From 826356bd5b8d320eb365383b58bbe323bed4a2fc Mon Sep 17 00:00:00 2001
+From: YiFei Zhu <zhuyifei@google.com>
+Date: Mon, 28 Mar 2022 17:51:31 -0700
+Subject: [PATCH 6/8] OvmfPkg/SmmCpuFeaturesLib: Enable SMRR & SMM_CODE_CHK_EN
+
+These are now implemented in our custom QEMU for the chal.
+Enable them.
+
+Signed-off-by: YiFei Zhu <zhuyifei@google.com>
+---
+ .../SmmCpuFeaturesLib/SmmCpuFeaturesLib.c     | 99 +++++++++++++++----
+ 1 file changed, 80 insertions(+), 19 deletions(-)
+
+diff --git a/OvmfPkg/Library/SmmCpuFeaturesLib/SmmCpuFeaturesLib.c b/OvmfPkg/Library/SmmCpuFeaturesLib/SmmCpuFeaturesLib.c
+index 9297cc5fa9..f5cbc645d4 100644
+--- a/OvmfPkg/Library/SmmCpuFeaturesLib/SmmCpuFeaturesLib.c
++++ b/OvmfPkg/Library/SmmCpuFeaturesLib/SmmCpuFeaturesLib.c
+@@ -12,6 +12,7 @@
+ #include <Library/DebugLib.h>
+ #include <Library/MemEncryptSevLib.h>
+ #include <Library/MemoryAllocationLib.h>
++#include <Library/MtrrLib.h>
+ #include <Library/PcdLib.h>
+ #include <Library/SafeIntLib.h>
+ #include <Library/SmmCpuFeaturesLib.h>
+@@ -19,9 +20,45 @@
+ #include <Library/UefiBootServicesTableLib.h>
+ #include <Pcd/CpuHotEjectData.h>
+ #include <PiSmm.h>
++#include <Register/Intel/Cpuid.h>
+ #include <Register/Intel/SmramSaveStateMap.h>
+ #include <Register/QemuSmramSaveStateMap.h>
+ 
++//
++// Machine Specific Registers (MSRs)
++//
++#define  SMM_FEATURES_LIB_IA32_MTRR_CAP            0x0FE
++#define  SMM_FEATURES_LIB_IA32_FEATURE_CONTROL     0x03A
++#define  SMM_FEATURES_LIB_IA32_SMRR_PHYSBASE       0x1F2
++#define  SMM_FEATURES_LIB_IA32_SMRR_PHYSMASK       0x1F3
++#define  SMM_FEATURES_LIB_IA32_CORE_SMRR_PHYSBASE  0x0A0
++#define  SMM_FEATURES_LIB_IA32_CORE_SMRR_PHYSMASK  0x0A1
++#define    EFI_MSR_SMRR_MASK                       0xFFFFF000
++#define    EFI_MSR_SMRR_PHYS_MASK_VALID            BIT11
++#define  SMM_FEATURES_LIB_SMM_FEATURE_CONTROL      0x4E0
++
++//
++// MSRs required for configuration of SMM Code Access Check
++//
++#define SMM_FEATURES_LIB_IA32_MCA_CAP              0x17D
++#define   SMM_CODE_ACCESS_CHK_BIT                  BIT58
++
++//
++// Set default value to assume MSR_SMM_FEATURE_CONTROL is not supported
++//
++BOOLEAN  mSmmFeatureControlSupported = FALSE;
++
++//
++// Set default value to assume IA-32 Architectural MSRs are used
++//
++UINT32  mSmrrPhysBaseMsr = SMM_FEATURES_LIB_IA32_SMRR_PHYSBASE;
++UINT32  mSmrrPhysMaskMsr = SMM_FEATURES_LIB_IA32_SMRR_PHYSMASK;
++
++//
++// Array for state of SMRR enable on all CPUs
++//
++BOOLEAN  *mSmrrEnabled;
++
+ //
+ // EFER register LMA bit
+ //
+@@ -44,8 +81,11 @@ SmmCpuFeaturesLibConstructor (
+   )
+ {
+   //
+-  // No need to program SMRRs on our virtual platform.
++  // Allocate array for state of SMRR enable on all CPUs
+   //
++  mSmrrEnabled = (BOOLEAN *)AllocatePool (sizeof (BOOLEAN) * PcdGet32 (PcdCpuMaxLogicalProcessorNumber));
++  ASSERT (mSmrrEnabled != NULL);
++
+   return EFI_SUCCESS;
+ }
+ 
+@@ -98,8 +138,32 @@ SmmCpuFeaturesInitializeProcessor (
+   }
+ 
+   //
+-  // No need to program SMRRs on our virtual platform.
++  // Program SMRR base/mask MSRs.
++  // The EFI_MSR_SMRR_PHYS_MASK_VALID bit is not set until the first normal SMI.
++  // The code that initializes SMM environment is running in normal mode
++  // from SMRAM region.  If SMRR is enabled here, then the SMRAM region
++  // is protected and the normal mode code execution will fail.
++  //
++  //
++  // SMRR size cannot be less than 4-KBytes
++  // SMRR size must be of length 2^n
++  // SMRR base alignment cannot be less than SMRR length
+   //
++  if ((CpuHotPlugData->SmrrSize < SIZE_4KB) ||
++      (CpuHotPlugData->SmrrSize != GetPowerOfTwo32 (CpuHotPlugData->SmrrSize)) ||
++      ((CpuHotPlugData->SmrrBase & ~(CpuHotPlugData->SmrrSize - 1)) != CpuHotPlugData->SmrrBase)) {
++    //
++    // Print message and halt if CPU is Monarch
++    //
++    if (IsMonarch) {
++      DEBUG ((DEBUG_ERROR, "SMM Base/Size does not meet alignment/size requirement!\n"));
++      CpuDeadLoop ();
++    }
++  } else {
++    AsmWriteMsr64 (mSmrrPhysBaseMsr, CpuHotPlugData->SmrrBase | MTRR_CACHE_WRITE_BACK);
++    AsmWriteMsr64 (mSmrrPhysMaskMsr, (~(CpuHotPlugData->SmrrSize - 1) & EFI_MSR_SMRR_MASK));
++    mSmrrEnabled[CpuIndex] = FALSE;
++  }
+ }
+ 
+ /**
+@@ -397,7 +461,7 @@ SmmCpuFeaturesNeedConfigureMtrrs (
+   VOID
+   )
+ {
+-  return FALSE;
++  return TRUE;
+ }
+ 
+ /**
+@@ -410,9 +474,7 @@ SmmCpuFeaturesDisableSmrr (
+   VOID
+   )
+ {
+-  //
+-  // No SMRR support, nothing to do
+-  //
++  AsmWriteMsr64 (mSmrrPhysMaskMsr, AsmReadMsr64(mSmrrPhysMaskMsr) & ~EFI_MSR_SMRR_PHYS_MASK_VALID);
+ }
+ 
+ /**
+@@ -425,9 +487,7 @@ SmmCpuFeaturesReenableSmrr (
+   VOID
+   )
+ {
+-  //
+-  // No SMRR support, nothing to do
+-  //
++  AsmWriteMsr64 (mSmrrPhysMaskMsr, AsmReadMsr64(mSmrrPhysMaskMsr) | EFI_MSR_SMRR_PHYS_MASK_VALID);
+ }
+ 
+ /**
+@@ -443,9 +503,8 @@ SmmCpuFeaturesRendezvousEntry (
+   IN UINTN  CpuIndex
+   )
+ {
+-  //
+-  // No SMRR support, nothing to do
+-  //
++  AsmWriteMsr64 (mSmrrPhysMaskMsr, AsmReadMsr64 (mSmrrPhysMaskMsr) | EFI_MSR_SMRR_PHYS_MASK_VALID);
++  mSmrrEnabled[CpuIndex] = TRUE;
+ }
+ 
+ /**
+@@ -517,7 +576,9 @@ SmmCpuFeaturesIsSmmRegisterSupported (
+   IN SMM_REG_NAME  RegName
+   )
+ {
+-  ASSERT (RegName == SmmRegFeatureControl);
++  if (RegName == SmmRegFeatureControl) {
++    return TRUE;
++  }
+   return FALSE;
+ }
+ 
+@@ -540,11 +601,9 @@ SmmCpuFeaturesGetSmmRegister (
+   IN SMM_REG_NAME  RegName
+   )
+ {
+-  //
+-  // This is called for SmmRegSmmDelayed, SmmRegSmmBlocked, SmmRegSmmEnable.
+-  // The last of these should actually be SmmRegSmmDisable, so we can just
+-  // return FALSE.
+-  //
++  if (RegName == SmmRegFeatureControl) {
++    return AsmReadMsr64 (SMM_FEATURES_LIB_SMM_FEATURE_CONTROL);
++  }
+   return 0;
+ }
+ 
+@@ -567,7 +626,9 @@ SmmCpuFeaturesSetSmmRegister (
+   IN UINT64        Value
+   )
+ {
+-  ASSERT (FALSE);
++  if (RegName == SmmRegFeatureControl) {
++    AsmWriteMsr64 (SMM_FEATURES_LIB_SMM_FEATURE_CONTROL, Value);
++  }
+ }
+ 
+ ///
+-- 
+2.35.1
+

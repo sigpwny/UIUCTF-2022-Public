@@ -1,0 +1,23 @@
+name: "Bro-key-n"
+author: "Husnain"
+category: crypto
+description: |-
+  I tried to save my SSH key, but it seems that some of it has gotten removed! If there are any data recovery experts out there, hopefully they can recover my key...if you can, try to connect to my server to reach back to me.
+
+  `ssh user@bro-key-n.chal.uiuc.tf -p 1337`
+
+  **author**: Husnain
+value: 500
+type: dynamic
+extra:
+  initial: 500
+  decay: 75
+  minimum: 50
+flags:
+  - uiuctf{hidden_in_plain_sight}
+tags:
+  - crypto 
+  - extreme
+files:
+  - key_redacted.pem
+state: hidden

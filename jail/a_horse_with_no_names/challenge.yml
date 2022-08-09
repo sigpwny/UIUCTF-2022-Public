@@ -1,0 +1,22 @@
+name: "A Horse with No Names"
+author: "kmh"
+category: jail
+description: |-
+  Can you make it through the desert on [a horse with no names](https://www.youtube.com/watch?v=na47wMFfQCo)?
+
+  `nc horse.chal.uiuc.tf 1337`
+
+  **author**: kmh
+value: 500
+type: dynamic
+extra:
+  initial: 500
+  decay: 75
+  minimum: 50
+flags:
+  - uiuctf{my_challenges_have_abandoned_any_pretense_of_practical_applicability_and_im_okay_with_that}
+files:
+  - challenge/desert.py
+  - challenge/Dockerfile
+state: visible
+version: "0.1"

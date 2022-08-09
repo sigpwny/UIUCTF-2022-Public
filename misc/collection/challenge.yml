@@ -1,0 +1,28 @@
+# This file represents the base specification of your challenge. It is used by
+# other tools to install and deploy your challenge.
+# Required sections
+name: "Collection"
+author: N/A
+category: misc
+description: |-
+  Here is the final art collection!
+  
+  > This is not stego since we've given you the answer in the hints and we don't want to frustrate anyone. However, this is very solvable without hints, so try avoiding hints first!
+  
+  Download collection.zip below!
+
+value: 50
+type: standard
+tags:
+  - definitely not stego
+files:
+  - collection.zip
+hints:
+  - These images look awfully familiar. A single pixel has been modified in each of these images, changing the blue value (RGB) to a character in the flag.
+  - The coordinate `(x, y)` represents a pixel on the image. All pixels were modified at `(0, y)`, where `y` represents the index of a character on the flag!
+  - Create a script that successfully takes all the modified blue values after comparing to the original images on the CTFd, and arrange them based on the `y` value!
+flags:
+  - uiuctf{Th1s_c0llect10n_is_n0w_c0mpl3ted_4f2335}
+# This is visible by default. It takes two values: hidden, visible.
+state: visible
+version: "0.1"

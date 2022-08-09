@@ -1,0 +1,22 @@
+name: "Everyone's A Critic 3"
+author: "Thomas"
+category: osint
+description: "There is a video game reviews content creator who has somehow ended up reviewing UIUCTF, make sure their reviews are not too harsh by investigating them!. Look for more clues on the YouTube channel..."
+value: 500
+type: dynamic
+extra:
+  initial: 500
+  decay: 75
+  minimum: 50
+flags:
+    - uiuctf{n3v3r_g0t_oUt_0F_s1LV3R}
+tags:
+    - osint
+    - youtube
+hints:
+    - The first two characters of the flag after uiuctf{ are `n3`
+state: hidden
+
+# Specifies what version of the challenge specification was used.
+# Subject to change until ctfcli v1.0.0
+version: "0.1"

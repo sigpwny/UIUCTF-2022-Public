@@ -1,0 +1,22 @@
+apiVersion: kctf.dev/v1
+kind: Challenge
+metadata:
+  name: ism-bot
+spec:
+  deployed: true
+  powDifficultySeconds: 0
+  network:
+    public: true
+  healthcheck:
+    # TIP: disable the healthcheck during development
+    enabled: true
+    image: us.gcr.io/dotted-forest-314903/ism-bot-healthcheck:700fde89975aa7d60f64278f7f436892c8ed6fcf24bd3cfa07018feace68d2c0
+  # You can allow the bot to connect to other challenges internally.
+  # This can be useful during testing so that you don't have to make your
+  # challenge public.
+  # The challenge will be reachable at $name.default.svc.cluster.local or
+  # simply at $name with the default k8s search list.
+  allowConnectTo:
+    - modernism
+    - precisionism
+  image: us.gcr.io/dotted-forest-314903/ism-bot-challenge:bb215c9d96ddbf79230fd14d849ba2017f837ff36142c8fdbe36e701301e6813

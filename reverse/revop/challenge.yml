@@ -1,0 +1,23 @@
+name: "revop"
+author: "boron"
+category: rev
+description: |-
+  PwnyOps has been working on some custom ops to use in our CNNs. We were able to compile one of our models as a shared library file containing the custom ops. However, the ONNX team messed up during export and the ONNX file just contains the names of the custom ops, and not the actual implementations. Can you reverse the compiled model to get the implementations and add them to the given ONNX file? We will use your ONNX file for inference, and if the results match those of the compiled model, you will get the flag.
+  `$ nc revop.chal.uiuc.tf 1337`
+
+  **author**: boron
+value: 500
+type: dynamic
+extra:
+  initial: 500
+  decay: 75
+  minimum: 50
+flags:
+  - uiuctf{c00l_@nd_cr8t1v3_mL_0p5_fr0m_pwnY_0p5_!!!!}
+tags:
+  - rev
+  - ml
+files:
+  - handout.tar.gz
+state: visible
+version: "0.1"

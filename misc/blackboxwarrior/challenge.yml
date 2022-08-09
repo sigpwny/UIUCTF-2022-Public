@@ -1,0 +1,22 @@
+# This file represents the base specification of your challenge. It is used by
+# other tools to install and deploy your challenge.
+
+# Required sections
+name: "blackboxwarrior"
+author: "helloca"
+category: misc
+description: |-
+  pull off the best heist in art history! transfer enough art out of the museum to pull off a successful
+value: 500
+type: dynamic
+extra:
+  initial: 500
+  decay: 75
+  minimum: 50
+flags:
+  - uiuctf{oh_n0_my_b4nksy}
+tags:
+  - misc
+  - ai
+state: hidden
+version: "0.1"

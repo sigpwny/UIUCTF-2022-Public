@@ -1,0 +1,1575 @@
+From 85db1bae75a7e651f844c3951866e18afcd23a58 Mon Sep 17 00:00:00 2001
+From: Jiewen Yao <jiewen.yao@intel.com>
+Date: Fri, 24 Feb 2017 15:41:04 +0800
+Subject: [PATCH 7/8] Merge in ASLR changes from SecurityEx
+
+This is as of https://github.com/jyao1/SecurityEx.git,
+commit f903d4e75954 ("Sync to latest core.") applied on top of
+commit 7b30036b5edc ("ArmVirtPkg/ArmVirt.dsc.inc: AARCH64:
+enable DXE image protection feature").
+
+Signed-off-by: Jiewen.yao@intel.com
+Signed-off-by: YiFei Zhu <zhuyifei@google.com>
+---
+ AslrPkg/AslrPkg.dec                           |  32 +++
+ AslrPkg/AslrPkg.dsc                           | 184 +++++++++++++++
+ AslrPkg/Contributions.txt                     | 218 ++++++++++++++++++
+ AslrPkg/License.txt                           |  25 ++
+ MdeModulePkg/Core/Dxe/Dispatcher/Dispatcher.c | 121 +++++++++-
+ MdeModulePkg/Core/Dxe/DxeMain.h               |  12 +
+ MdeModulePkg/Core/Dxe/DxeMain.inf             |   6 +
+ MdeModulePkg/Core/Dxe/Gcd/Gcd.c               |  34 +++
+ MdeModulePkg/Core/Dxe/Image/Image.c           |  60 ++++-
+ MdeModulePkg/Core/DxeIplPeim/DxeIpl.h         |   1 +
+ MdeModulePkg/Core/DxeIplPeim/DxeIpl.inf       |   3 +
+ MdeModulePkg/Core/DxeIplPeim/DxeLoad.c        |  32 +++
+ MdeModulePkg/Core/PiSmmCore/Dispatcher.c      | 217 +++++++++--------
+ MdeModulePkg/Core/PiSmmCore/Page.c            |  54 ++++-
+ MdeModulePkg/Core/PiSmmCore/PiSmmCore.c       |  35 ---
+ MdeModulePkg/Core/PiSmmCore/PiSmmCore.h       |   5 +-
+ MdeModulePkg/Core/PiSmmCore/PiSmmCore.inf     |   6 +
+ MdeModulePkg/Core/PiSmmCore/PiSmmIpl.c        |  22 ++
+ MdeModulePkg/Core/PiSmmCore/PiSmmIpl.inf      |   3 +
+ 19 files changed, 927 insertions(+), 143 deletions(-)
+ create mode 100644 AslrPkg/AslrPkg.dec
+ create mode 100644 AslrPkg/AslrPkg.dsc
+ create mode 100644 AslrPkg/Contributions.txt
+ create mode 100644 AslrPkg/License.txt
+
+diff --git a/AslrPkg/AslrPkg.dec b/AslrPkg/AslrPkg.dec
+new file mode 100644
+index 0000000000..62c3781325
+--- /dev/null
++++ b/AslrPkg/AslrPkg.dec
+@@ -0,0 +1,32 @@
++## @file
++#
++# Copyright (c) 2016, Intel Corporation. All rights reserved.<BR>
++#
++#    This program and the accompanying materials
++#    are licensed and made available under the terms and conditions of the BSD License
++#    which accompanies this distribution. The full text of the license may be found at
++#    http://opensource.org/licenses/bsd-license.php
++#
++#    THE PROGRAM IS DISTRIBUTED UNDER THE BSD LICENSE ON AN "AS IS" BASIS,
++#    WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
++#
++##
++
++[Defines]
++  DEC_SPECIFICATION              = 0x00010005
++  PACKAGE_NAME                   = AslrPkg
++  PACKAGE_GUID                   = 49ECDD2B-7403-46D0-9BFD-4164556047D2
++  PACKAGE_VERSION                = 0.1
++
++[Includes]
++
++[Guids]
++  gEfiAslrPkgTokenSpaceGuid       = { 0x502532c8, 0xf940, 0x4a04, { 0xa9, 0xd2, 0x34, 0xdb, 0x8d, 0xa5, 0x39, 0x75 }}
++
++[PcdsFeatureFlag]
++  ## This PCD control ASLR image shuffle enabling.
++  gEfiAslrPkgTokenSpaceGuid.PcdImageShuffleEnable|TRUE|BOOLEAN|0x00010001
++
++[PcdsFixedAtBuild, PcdsPatchableInModule]
++  ## This PCD control ASLR entropy bits.
++  gEfiAslrPkgTokenSpaceGuid.PcdASLRMinimumEntropyBits|0x04|UINT8|0x00000001
+diff --git a/AslrPkg/AslrPkg.dsc b/AslrPkg/AslrPkg.dsc
+new file mode 100644
+index 0000000000..2812f8d8b6
+--- /dev/null
++++ b/AslrPkg/AslrPkg.dsc
+@@ -0,0 +1,184 @@
++## @file
++#
++# Copyright (c) 2012, Intel Corporation. All rights reserved.<BR>
++#
++#    This program and the accompanying materials
++#    are licensed and made available under the terms and conditions of the BSD License
++#    which accompanies this distribution. The full text of the license may be found at
++#    http://opensource.org/licenses/bsd-license.php
++#
++#    THE PROGRAM IS DISTRIBUTED UNDER THE BSD LICENSE ON AN "AS IS" BASIS,
++#    WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
++#
++##
++
++[Defines]
++  PLATFORM_NAME                  = AslrPkg
++  PLATFORM_GUID                  = 6679A30A-4D79-40A7-A5A6-8BD065387B84
++  PLATFORM_VERSION               = 0.1
++  DSC_SPECIFICATION              = 0x00010005
++  OUTPUT_DIRECTORY               = Build/AslrPkg
++  SUPPORTED_ARCHITECTURES        = IA32|IPF|X64|EBC
++  BUILD_TARGETS                  = DEBUG|RELEASE|NOOPT
++  SKUID_IDENTIFIER               = DEFAULT
++
++[LibraryClasses]
++  #
++  # Entry point
++  #
++  UefiApplicationEntryPoint|MdePkg/Library/UefiApplicationEntryPoint/UefiApplicationEntryPoint.inf
++  UefiDriverEntryPoint|MdePkg/Library/UefiDriverEntryPoint/UefiDriverEntryPoint.inf
++  #
++  # Basic
++  #
++  BaseLib|MdePkg/Library/BaseLib/BaseLib.inf
++  BaseMemoryLib|MdePkg/Library/BaseMemoryLib/BaseMemoryLib.inf
++  CpuLib|MdePkg/Library/BaseCpuLib/BaseCpuLib.inf
++  SynchronizationLib|MdePkg/Library/BaseSynchronizationLib/BaseSynchronizationLib.inf
++  PrintLib|MdePkg/Library/BasePrintLib/BasePrintLib.inf
++  IoLib|MdePkg/Library/BaseIoLibIntrinsic/BaseIoLibIntrinsic.inf
++  PciLib|MdePkg/Library/BasePciLibCf8/BasePciLibCf8.inf
++  PciCf8Lib|MdePkg/Library/BasePciCf8Lib/BasePciCf8Lib.inf
++  CacheMaintenanceLib|MdePkg/Library/BaseCacheMaintenanceLib/BaseCacheMaintenanceLib.inf
++  PeCoffGetEntryPointLib|MdePkg/Library/BasePeCoffGetEntryPointLib/BasePeCoffGetEntryPointLib.inf
++  PeCoffLib|MdePkg/Library/BasePeCoffLib/BasePeCoffLib.inf
++  PeCoffExtraActionLib|MdePkg/Library/BasePeCoffExtraActionLibNull/BasePeCoffExtraActionLibNull.inf
++
++  #
++  # PEI
++  #
++  PeimEntryPoint|MdePkg/Library/PeimEntryPoint/PeimEntryPoint.inf
++  PeiServicesTablePointerLib|MdePkg/Library/PeiServicesTablePointerLibIdt/PeiServicesTablePointerLibIdt.inf
++  PeiServicesLib|MdePkg/Library/PeiServicesLib/PeiServicesLib.inf
++  #
++  # UEFI & PI
++  #
++  UefiBootServicesTableLib|MdePkg/Library/UefiBootServicesTableLib/UefiBootServicesTableLib.inf
++  UefiRuntimeServicesTableLib|MdePkg/Library/UefiRuntimeServicesTableLib/UefiRuntimeServicesTableLib.inf
++  UefiLib|MdePkg/Library/UefiLib/UefiLib.inf
++  UefiHiiServicesLib|MdeModulePkg/Library/UefiHiiServicesLib/UefiHiiServicesLib.inf
++  HiiLib|MdeModulePkg/Library/UefiHiiLib/UefiHiiLib.inf
++  DevicePathLib|MdePkg/Library/UefiDevicePathLib/UefiDevicePathLib.inf
++  DxeServicesLib|MdePkg/Library/DxeServicesLib/DxeServicesLib.inf
++  DxeServicesTableLib|MdePkg/Library/DxeServicesTableLib/DxeServicesTableLib.inf
++  #
++  # Generic Modules
++  #
++  TimerLib|MdePkg/Library/BaseTimerLibNullTemplate/BaseTimerLibNullTemplate.inf
++  CapsuleLib|MdeModulePkg/Library/DxeCapsuleLibNull/DxeCapsuleLibNull.inf
++  PcdLib|MdePkg/Library/BasePcdLibNull/BasePcdLibNull.inf
++  #
++  # Misc
++  #
++  DebugLib|IntelFrameworkModulePkg/Library/PeiDxeDebugLibReportStatusCode/PeiDxeDebugLibReportStatusCode.inf
++  DebugPrintErrorLevelLib|MdePkg/Library/BaseDebugPrintErrorLevelLib/BaseDebugPrintErrorLevelLib.inf  
++  ReportStatusCodeLib|MdeModulePkg/Library/DxeReportStatusCodeLib/DxeReportStatusCodeLib.inf
++  PerformanceLib|MdePkg/Library/BasePerformanceLibNull/BasePerformanceLibNull.inf
++  DebugAgentLib|MdeModulePkg/Library/DebugAgentLibNull/DebugAgentLibNull.inf
++  UefiDecompressLib|IntelFrameworkModulePkg/Library/BaseUefiTianoCustomDecompressLib/BaseUefiTianoCustomDecompressLib.inf
++  OemHookStatusCodeLib|MdeModulePkg/Library/OemHookStatusCodeLibNull/OemHookStatusCodeLibNull.inf
++  
++  #
++  # CPU
++  #
++  MtrrLib|UefiCpuPkg/Library/MtrrLib/MtrrLib.inf
++  LocalApicLib|UefiCpuPkg/Library/BaseXApicX2ApicLib/BaseXApicX2ApicLib.inf
++  UefiCpuLib|UefiCpuPkg/Library/BaseUefiCpuLib/BaseUefiCpuLib.inf
++  SmmLib|MdePkg/Library/SmmLibNull/SmmLibNull.inf
++  CpuExceptionHandlerLib|MdeModulePkg/Library/CpuExceptionHandlerLibNull/CpuExceptionHandlerLibNull.inf
++
++  IntrinsicLib|CryptoPkg/Library/IntrinsicLib/IntrinsicLib.inf
++  OpensslLib|CryptoPkg/Library/OpensslLib/OpensslLib.inf
++  RngLib|MdePkg/Library/BaseRngLib/BaseRngLib.inf
++
++  PlatformSecureLib|SecurityPkg/Library/PlatformSecureLibNull/PlatformSecureLibNull.inf
++  SecurityManagementLib|MdeModulePkg/Library/DxeSecurityManagementLib/DxeSecurityManagementLib.inf
++  LockBoxLib|MdeModulePkg/Library/LockBoxNullLib/LockBoxNullLib.inf
++  SmmMemLib|MdePkg/Library/SmmMemLib/SmmMemLib.inf
++
++[LibraryClasses.common.PEIM]
++  ExtractGuidedSectionLib|MdePkg/Library/PeiExtractGuidedSectionLib/PeiExtractGuidedSectionLib.inf
++  HobLib|MdePkg/Library/PeiHobLib/PeiHobLib.inf
++  MemoryAllocationLib|MdePkg/Library/PeiMemoryAllocationLib/PeiMemoryAllocationLib.inf
++  BaseCryptLib|CryptoPkg/Library/BaseCryptLib/PeiCryptLib.inf
++  ReportStatusCodeLib|MdeModulePkg/Library/PeiReportStatusCodeLib/PeiReportStatusCodeLib.inf
++
++[LibraryClasses.common.PEI_CORE]
++  PeiCoreEntryPoint|MdePkg/Library/PeiCoreEntryPoint/PeiCoreEntryPoint.inf
++  ExtractGuidedSectionLib|MdePkg/Library/PeiExtractGuidedSectionLib/PeiExtractGuidedSectionLib.inf
++  HobLib|MdePkg/Library/PeiHobLib/PeiHobLib.inf
++  MemoryAllocationLib|MdePkg/Library/PeiMemoryAllocationLib/PeiMemoryAllocationLib.inf
++  BaseCryptLib|CryptoPkg/Library/BaseCryptLib/PeiCryptLib.inf
++
++[LibraryClasses.common.DXE_CORE]
++  DxeCoreEntryPoint|MdePkg/Library/DxeCoreEntryPoint/DxeCoreEntryPoint.inf
++  ExtractGuidedSectionLib|MdePkg/Library/DxeExtractGuidedSectionLib/DxeExtractGuidedSectionLib.inf
++  HobLib|MdePkg/Library/DxeCoreHobLib/DxeCoreHobLib.inf
++  MemoryAllocationLib|MdeModulePkg/Library/DxeCoreMemoryAllocationLib/DxeCoreMemoryAllocationLib.inf
++  BaseCryptLib|CryptoPkg/Library/BaseCryptLib/BaseCryptLib.inf
++
++[LibraryClasses.common.DXE_DRIVER]
++  HobLib|MdePkg/Library/DxeHobLib/DxeHobLib.inf
++  MemoryAllocationLib|MdePkg/Library/UefiMemoryAllocationLib/UefiMemoryAllocationLib.inf
++  BaseCryptLib|CryptoPkg/Library/BaseCryptLib/BaseCryptLib.inf
++
++[LibraryClasses.common.UEFI_DRIVER]
++  HobLib|MdePkg/Library/DxeHobLib/DxeHobLib.inf
++  MemoryAllocationLib|MdePkg/Library/UefiMemoryAllocationLib/UefiMemoryAllocationLib.inf
++  BaseCryptLib|CryptoPkg/Library/BaseCryptLib/BaseCryptLib.inf
++
++[LibraryClasses.common.DXE_RUNTIME_DRIVER]
++  HobLib|MdePkg/Library/DxeHobLib/DxeHobLib.inf
++  MemoryAllocationLib|MdePkg/Library/UefiMemoryAllocationLib/UefiMemoryAllocationLib.inf
++  UefiRuntimeLib|MdePkg/Library/UefiRuntimeLib/UefiRuntimeLib.inf
++  BaseCryptLib|CryptoPkg/Library/BaseCryptLib/RuntimeCryptLib.inf
++
++[LibraryClasses.common.SMM_CORE]
++  HobLib|MdePkg/Library/DxeHobLib/DxeHobLib.inf
++  MemoryAllocationLib|MdeModulePkg/Library/PiSmmCoreMemoryAllocationLib/PiSmmCoreMemoryAllocationLib.inf
++  SmmCorePlatformHookLib|MdeModulePkg/Library/SmmCorePlatformHookLibNull/SmmCorePlatformHookLibNull.inf
++  SmmServicesTableLib|MdeModulePkg/Library/PiSmmCoreSmmServicesTableLib/PiSmmCoreSmmServicesTableLib.inf
++  BaseCryptLib|CryptoPkg/Library/BaseCryptLib/SmmCryptLib.inf
++
++[LibraryClasses.common.DXE_SMM_DRIVER]
++  HobLib|MdePkg/Library/DxeHobLib/DxeHobLib.inf
++  MemoryAllocationLib|MdePkg/Library/SmmMemoryAllocationLib/SmmMemoryAllocationLib.inf
++  SmmServicesTableLib|MdePkg/Library/SmmServicesTableLib/SmmServicesTableLib.inf
++  BaseCryptLib|CryptoPkg/Library/BaseCryptLib/SmmCryptLib.inf
++
++[LibraryClasses.common.UEFI_APPLICATION]
++  HobLib|MdePkg/Library/DxeHobLib/DxeHobLib.inf
++  MemoryAllocationLib|MdePkg/Library/UefiMemoryAllocationLib/UefiMemoryAllocationLib.inf
++  BaseCryptLib|CryptoPkg/Library/BaseCryptLib/BaseCryptLib.inf
++
++###################################################################################################
++#
++# Components Section - list of the modules and components that will be processed by compilation
++#                      tools and the EDK II tools to generate PE32/PE32+/Coff image files.
++#
++# Note: The EDK II DSC file is not used to specify how compiled binary images get placed
++#       into firmware volume images. This section is just a list of modules to compile from
++#       source into UEFI-compliant binaries.
++#       It is the FDF file that contains information on combining binary files into firmware
++#       volume images, whose concept is beyond UEFI and is described in PI specification.
++#       Binary modules do not need to be listed in this section, as they should be
++#       specified in the FDF file. For example: Shell binary (Shell_Full.efi), FAT binary (Fat.efi),
++#       Logo (Logo.bmp), and etc.
++#       There may also be modules listed in this section that are not required in the FDF file,
++#       When a module listed here is excluded from FDF file, then UEFI-compliant binary will be
++#       generated for it, but the binary will not be put into any firmware volume.
++#
++###################################################################################################
++
++[PcdsFixedAtBuild.common]
++  gEfiMdePkgTokenSpaceGuid.PcdDebugPropertyMask|0x1f
++  gEfiMdePkgTokenSpaceGuid.PcdDebugPrintErrorLevel|0x80080046
++  gEfiMdePkgTokenSpaceGuid.PcdReportStatusCodePropertyMask|0x07
++  gEfiMdePkgTokenSpaceGuid.PcdPerformanceLibraryPropertyMask|0x1
++
++[Components]
++  AslrPkg/Override/MdeModulePkg/Core/PiSmmCore/PiSmmCore.inf
++  AslrPkg/Override/MdeModulePkg/Core/PiSmmCore/PiSmmIpl.inf
++  AslrPkg/Override/MdeModulePkg/Core/Dxe/DxeMain.inf
++  AslrPkg/Override/MdeModulePkg/Core/DxeIplPeim/DxeIpl.inf
++
+diff --git a/AslrPkg/Contributions.txt b/AslrPkg/Contributions.txt
+new file mode 100644
+index 0000000000..f87cbd73c6
+--- /dev/null
++++ b/AslrPkg/Contributions.txt
+@@ -0,0 +1,218 @@
++
++======================
++= Code Contributions =
++======================
++
++To make a contribution to a TianoCore project, follow these steps.
++1. Create a change description in the format specified below to
++   use in the source control commit log.
++2. Your commit message must include your "Signed-off-by" signature,
++   and "Contributed-under" message.
++3. Your "Contributed-under" message explicitly states that the
++   contribution is made under the terms of the specified
++   contribution agreement.  Your "Contributed-under" message
++   must include the name of contribution agreement and version.
++   For example: Contributed-under: TianoCore Contribution Agreement 1.0
++   The "TianoCore Contribution Agreement" is included below in
++   this document.
++4. Submit your code to the TianoCore project using the process
++   that the project documents on its web page.  If the process is
++   not documented, then submit the code on development email list
++   for the project.
++5. It is preferred that contributions are submitted using the same
++   copyright license as the base project. When that is not possible,
++   then contributions using the following licenses can be accepted:
++   * BSD (2-clause): http://opensource.org/licenses/BSD-2-Clause
++   * BSD (3-clause): http://opensource.org/licenses/BSD-3-Clause
++   * MIT: http://opensource.org/licenses/MIT
++   * Python-2.0: http://opensource.org/licenses/Python-2.0
++   * Zlib: http://opensource.org/licenses/Zlib
++
++   Contributions of code put into the public domain can also be
++   accepted.
++
++   Contributions using other licenses might be accepted, but further
++   review will be required.
++
++=====================================================
++= Change Description / Commit Message / Patch Email =
++=====================================================
++
++Your change description should use the standard format for a
++commit message, and must include your "Signed-off-by" signature
++and the "Contributed-under" message.
++
++== Sample Change Description / Commit Message =
++
++=== Start of sample patch email message ===
++
++From: Contributor Name <contributor@example.com>
++Subject: [PATCH] CodeModule: Brief-single-line-summary
++
++Full-commit-message
++
++Contributed-under: TianoCore Contribution Agreement 1.0
++Signed-off-by: Contributor Name <contributor@example.com>
++---
++
++An extra message for the patch email which will not be considered part
++of the commit message can be added here.
++
++Patch content inline or attached
++
++=== End of sample patch email message ===
++
++=== Notes for sample patch email ===
++
++* The first line of commit message is taken from the email's subject
++  line following [PATCH]. The remaining portion of the commit message
++  is the email's content until the '---' line.
++* git format-patch is one way to create this format
++
++=== Definitions for sample patch email ===
++
++* "CodeModule" is a short idenfier for the affected code.  For
++  example MdePkg, or MdeModulePkg UsbBusDxe.
++* "Brief-single-line-summary" is a short summary of the change.
++* The entire first line should be less than ~70 characters.
++* "Full-commit-message" a verbose multiple line comment describing
++  the change.  Each line should be less than ~70 characters.
++* "Contributed-under" explicitely states that the contribution is
++  made under the terms of the contribtion agreement.  This
++  agreement is included below in this document.
++* "Signed-off-by" is the contributor's signature identifying them
++  by their real/legal name and their email address.
++
++========================================
++= TianoCore Contribution Agreement 1.0 =
++========================================
++
++INTEL CORPORATION ("INTEL") MAKES AVAILABLE SOFTWARE, DOCUMENTATION,
++INFORMATION AND/OR OTHER MATERIALS FOR USE IN THE TIANOCORE OPEN SOURCE
++PROJECT (COLLECTIVELY "CONTENT"). USE OF THE CONTENT IS GOVERNED BY THE
++TERMS AND CONDITIONS OF THIS AGREEMENT BETWEEN YOU AND INTEL AND/OR THE
++TERMS AND CONDITIONS OF LICENSE AGREEMENTS OR NOTICES INDICATED OR
++REFERENCED BELOW. BY USING THE CONTENT, YOU AGREE THAT YOUR USE OF THE
++CONTENT IS GOVERNED BY THIS AGREEMENT AND/OR THE TERMS AND CONDITIONS
++OF ANY APPLICABLE LICENSE AGREEMENTS OR NOTICES INDICATED OR REFERENCED
++BELOW. IF YOU DO NOT AGREE TO THE TERMS AND CONDITIONS OF THIS
++AGREEMENT AND THE TERMS AND CONDITIONS OF ANY APPLICABLE LICENSE
++AGREEMENTS OR NOTICES INDICATED OR REFERENCED BELOW, THEN YOU MAY NOT
++USE THE CONTENT.
++
++Unless otherwise indicated, all Content made available on the TianoCore
++site is provided to you under the terms and conditions of the BSD
++License ("BSD"). A copy of the BSD License is available at
++http://opensource.org/licenses/bsd-license.php
++or when applicable, in the associated License.txt file.
++
++Certain other content may be made available under other licenses as
++indicated in or with such Content. (For example, in a License.txt file.)
++
++You accept and agree to the following terms and conditions for Your
++present and future Contributions submitted to TianoCore site. Except
++for the license granted to Intel hereunder, You reserve all right,
++title, and interest in and to Your Contributions.
++
++== SECTION 1: Definitions ==
++* "You" or "Contributor" shall mean the copyright owner or legal
++  entity authorized by the copyright owner that is making a
++  Contribution hereunder. All other entities that control, are
++  controlled by, or are under common control with that entity are
++  considered to be a single Contributor. For the purposes of this
++  definition, "control" means (i) the power, direct or indirect, to
++  cause the direction or management of such entity, whether by
++  contract or otherwise, or (ii) ownership of fifty percent (50%)
++  or more of the outstanding shares, or (iii) beneficial ownership
++  of such entity.
++* "Contribution" shall mean any original work of authorship,
++  including any modifications or additions to an existing work,
++  that is intentionally submitted by You to the TinaoCore site for
++  inclusion in, or documentation of, any of the Content. For the
++  purposes of this definition, "submitted" means any form of
++  electronic, verbal, or written communication sent to the
++  TianoCore site or its representatives, including but not limited
++  to communication on electronic mailing lists, source code
++  control systems, and issue tracking systems that are managed by,
++  or on behalf of, the TianoCore site for the purpose of
++  discussing and improving the Content, but excluding
++  communication that is conspicuously marked or otherwise
++  designated in writing by You as "Not a Contribution."
++
++== SECTION 2: License for Contributions ==
++* Contributor hereby agrees that redistribution and use of the
++  Contribution in source and binary forms, with or without
++  modification, are permitted provided that the following
++  conditions are met:
++** Redistributions of source code must retain the Contributor's
++   copyright notice, this list of conditions and the following
++   disclaimer.
++** Redistributions in binary form must reproduce the Contributor's
++   copyright notice, this list of conditions and the following
++   disclaimer in the documentation and/or other materials provided
++   with the distribution.
++* Disclaimer. None of the names of Contributor, Intel, or the names
++  of their respective contributors may be used to endorse or
++  promote products derived from this software without specific
++  prior written permission.
++* Contributor grants a license (with the right to sublicense) under
++  claims of Contributor's patents that Contributor can license that
++  are infringed by the Contribution (as delivered by Contributor) to
++  make, use, distribute, sell, offer for sale, and import the
++  Contribution and derivative works thereof solely to the minimum
++  extent necessary for licensee to exercise the granted copyright
++  license; this patent license applies solely to those portions of
++  the Contribution that are unmodified. No hardware per se is
++  licensed.
++* EXCEPT AS EXPRESSLY SET FORTH IN SECTION 3 BELOW, THE
++  CONTRIBUTION IS PROVIDED BY THE CONTRIBUTOR "AS IS" AND ANY
++  EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO,
++  THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
++  PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
++  CONTRIBUTOR BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
++  SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
++  NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
++  LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
++  HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
++  CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
++  OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THE
++  CONTRIBUTION, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH
++  DAMAGE.
++
++== SECTION 3: Representations ==
++* You represent that You are legally entitled to grant the above
++  license. If your employer(s) has rights to intellectual property
++  that You create that includes Your Contributions, You represent
++  that You have received permission to make Contributions on behalf
++  of that employer, that Your employer has waived such rights for
++  Your Contributions.
++* You represent that each of Your Contributions is Your original
++  creation (see Section 4 for submissions on behalf of others).
++  You represent that Your Contribution submissions include complete
++  details of any third-party license or other restriction
++  (including, but not limited to, related patents and trademarks)
++  of which You are personally aware and which are associated with
++  any part of Your Contributions.
++
++== SECTION 4: Third Party Contributions ==
++* Should You wish to submit work that is not Your original creation,
++  You may submit it to TianoCore site separately from any
++  Contribution, identifying the complete details of its source
++  and of any license or other restriction (including, but not
++  limited to, related patents, trademarks, and license agreements)
++  of which You are personally aware, and conspicuously marking the
++  work as "Submitted on behalf of a third-party: [named here]".
++
++== SECTION 5: Miscellaneous ==
++* Applicable Laws. Any claims arising under or relating to this
++  Agreement shall be governed by the internal substantive laws of
++  the State of Delaware or federal courts located in Delaware,
++  without regard to principles of conflict of laws.
++* Language. This Agreement is in the English language only, which
++  language shall be controlling in all respects, and all versions
++  of this Agreement in any other language shall be for accommodation
++  only and shall not be binding. All communications and notices made
++  or given pursuant to this Agreement, and all documentation and
++  support to be provided, unless otherwise noted, shall be in the
++  English language.
++
+diff --git a/AslrPkg/License.txt b/AslrPkg/License.txt
+new file mode 100644
+index 0000000000..be68999be6
+--- /dev/null
++++ b/AslrPkg/License.txt
+@@ -0,0 +1,25 @@
++Copyright (c) 2012, Intel Corporation. All rights reserved.
++
++Redistribution and use in source and binary forms, with or without
++modification, are permitted provided that the following conditions
++are met:
++
++* Redistributions of source code must retain the above copyright
++  notice, this list of conditions and the following disclaimer.
++* Redistributions in binary form must reproduce the above copyright
++  notice, this list of conditions and the following disclaimer in
++  the documentation and/or other materials provided with the
++  distribution.
++
++THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
++"AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
++LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
++FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
++COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
++INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
++BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
++LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
++CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
++LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
++ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
++POSSIBILITY OF SUCH DAMAGE.
+diff --git a/MdeModulePkg/Core/Dxe/Dispatcher/Dispatcher.c b/MdeModulePkg/Core/Dxe/Dispatcher/Dispatcher.c
+index fb9ae3ce78..afdac11a9f 100644
+--- a/MdeModulePkg/Core/Dxe/Dispatcher/Dispatcher.c
++++ b/MdeModulePkg/Core/Dxe/Dispatcher/Dispatcher.c
+@@ -1177,6 +1177,118 @@ CoreProcessFvImageFile (
+   }
+ }
+ 
++/**
++This function shuffle a UINN array.
++
++@param Data  The pointer of the UINTN array
++@param Count The element count of the UINTN array
++**/
++VOID
++ShuffleData(
++  IN OUT UINTN  *Data,
++  IN     UINTN  Count
++  )
++{
++  UINTN                         Index;
++  UINTN                         Position;
++  UINT64                        Position64;
++  UINTN                         Temp;
++
++  if (Count == 0) {
++    return;
++  }
++
++  DEBUG((EFI_D_INFO, "DxeCore: before shuffle: "));
++  for (Index = 0; Index < Count; Index++) {
++    DEBUG((EFI_D_INFO, "0x%08x, ", Data[Index]));
++  }
++  DEBUG((EFI_D_INFO, "\n"));
++
++  for (Index = 0; Index < Count; Index++) {
++    GetRandomNumber64(&Position64);
++    Position = (UINTN)Position64;
++    Position = Position % Count;
++    Temp = Data[Index];
++    Data[Index] = Data[Position];
++    Data[Position] = Temp;
++  }
++
++  DEBUG((EFI_D_INFO, "DxeCore: after shuffle: "));
++  for (Index = 0; Index < Count; Index++) {
++    DEBUG((EFI_D_INFO, "0x%08x, ", Data[Index]));
++  }
++  DEBUG((EFI_D_INFO, "\n"));
++}
++
++/**
++  This function loads all BS drivers in DiscoveredList
++  into memory with random order.
++**/
++VOID
++DxeCoreLoadImages(
++  VOID
++  )
++{
++  LIST_ENTRY                    *Link;
++  EFI_CORE_DRIVER_ENTRY         *DriverEntry;
++  UINTN                         Index;
++  UINTN                         Count;
++  EFI_CORE_DRIVER_ENTRY         **AllDriverEntries;
++  UINT16                        ImageType;
++
++  DEBUG((EFI_D_INFO, "DxeCoreLoadImages\n"));
++
++  //
++  // Calculate total image Count
++  //
++  for (Count = 0, Link = mDiscoveredList.ForwardLink; Link != &mDiscoveredList; Count++, Link = Link->ForwardLink) {
++  }
++
++  //
++  // Allocate cache for all EFI_SMM_DRIVER_ENTRYs
++  //
++  AllDriverEntries = AllocateZeroPool(sizeof(EFI_CORE_DRIVER_ENTRY *) * Count);
++  ASSERT(AllDriverEntries != NULL);
++
++  //
++  // Cache each DriverEntry entry
++  //
++  for (Index = 0, Link = mDiscoveredList.ForwardLink; Link != &mDiscoveredList; Index++, Link = Link->ForwardLink) {
++    DriverEntry = CR(Link, EFI_CORE_DRIVER_ENTRY, Link, EFI_CORE_DRIVER_ENTRY_SIGNATURE);
++    AllDriverEntries[Index] = DriverEntry;
++  }
++
++  //
++  // Shuffle array
++  //
++  ShuffleData((UINTN *)AllDriverEntries, Count);
++
++  //
++  // Load Images
++  //
++  ImageType = EFI_IMAGE_SUBSYSTEM_EFI_BOOT_SERVICE_DRIVER;
++  for (Index = 0; Index < Count; Index++) {
++    DriverEntry = AllDriverEntries[Index];
++    if (DriverEntry->ImageHandle == NULL && !DriverEntry->IsFvImage) {
++      CoreLoadImageWithType(
++        FALSE,
++        gDxeCoreImageHandle,
++        DriverEntry->FvFileDevicePath,
++        NULL,
++        0,
++        &DriverEntry->ImageHandle,
++        &ImageType
++        );
++    }
++  }
++
++  //
++  // Destroy cache
++  //
++  ZeroMem(AllDriverEntries, sizeof(EFI_CORE_DRIVER_ENTRY *) * Count);
++  FreePool(AllDriverEntries);
++}
++
+ /**
+   Event notification that is fired every time a FV dispatch protocol is added.
+   More than one protocol may have been added when this event is fired, so you
+@@ -1237,7 +1349,7 @@ CoreFwVolEventProtocolNotify (
+       //
+       // If no more notification events exit
+       //
+-      return;
++      break;
+     }
+ 
+     if (FvHasBeenProcessed (FvHandle)) {
+@@ -1433,6 +1545,13 @@ CoreFwVolEventProtocolNotify (
+     //
+     CoreFreePool (AprioriFile);
+   }
++
++  if (FeaturePcdGet(PcdImageShuffleEnable)) {
++    //
++    // In order to support Image shuffle, we need load image at first.
++    //
++    DxeCoreLoadImages();
++  }
+ }
+ 
+ /**
+diff --git a/MdeModulePkg/Core/Dxe/DxeMain.h b/MdeModulePkg/Core/Dxe/DxeMain.h
+index 815a6b4bd8..7f5a3f4e7f 100644
+--- a/MdeModulePkg/Core/Dxe/DxeMain.h
++++ b/MdeModulePkg/Core/Dxe/DxeMain.h
+@@ -84,6 +84,7 @@ SPDX-License-Identifier: BSD-2-Clause-Patent
+ #include <Library/DxeServicesLib.h>
+ #include <Library/DebugAgentLib.h>
+ #include <Library/CpuExceptionHandlerLib.h>
++#include <Library/RngLib.h>
+ 
+ //
+ // attributes for reserved memory before it is promoted to system memory
+@@ -1358,6 +1359,17 @@ CoreLoadImage (
+   OUT EFI_HANDLE               *ImageHandle
+   );
+ 
++EFI_STATUS
++CoreLoadImageWithType(
++  IN BOOLEAN                    BootPolicy,
++  IN EFI_HANDLE                 ParentImageHandle,
++  IN EFI_DEVICE_PATH_PROTOCOL   *FilePath,
++  IN VOID                       *SourceBuffer   OPTIONAL,
++  IN UINTN                      SourceSize,
++  OUT EFI_HANDLE                *ImageHandle,
++  IN UINT16                     *ImageType OPTIONAL
++  );
++
+ /**
+   Unloads an image.
+ 
+diff --git a/MdeModulePkg/Core/Dxe/DxeMain.inf b/MdeModulePkg/Core/Dxe/DxeMain.inf
+index e4bca89577..a1287a2c83 100644
+--- a/MdeModulePkg/Core/Dxe/DxeMain.inf
++++ b/MdeModulePkg/Core/Dxe/DxeMain.inf
+@@ -71,6 +71,7 @@
+ [Packages]
+   MdePkg/MdePkg.dec
+   MdeModulePkg/MdeModulePkg.dec
++  AslrPkg/AslrPkg.dec
+ 
+ [LibraryClasses]
+   BaseMemoryLib
+@@ -94,6 +95,7 @@
+   DebugAgentLib
+   CpuExceptionHandlerLib
+   PcdLib
++  RngLib
+ 
+ [Guids]
+   gEfiEventMemoryMapChangeGuid                  ## PRODUCES             ## Event
+@@ -170,6 +172,9 @@
+   gEfiCapsuleArchProtocolGuid                   ## CONSUMES
+   gEfiWatchdogTimerArchProtocolGuid             ## CONSUMES
+ 
++[FeaturePcd]
++  gEfiAslrPkgTokenSpaceGuid.PcdImageShuffleEnable                           ## CONSUMES
++
+ [Pcd]
+   gEfiMdeModulePkgTokenSpaceGuid.PcdLoadFixAddressBootTimeCodePageNumber    ## SOMETIMES_CONSUMES
+   gEfiMdeModulePkgTokenSpaceGuid.PcdLoadFixAddressRuntimeCodePageNumber     ## SOMETIMES_CONSUMES
+@@ -186,6 +191,7 @@
+   gEfiMdeModulePkgTokenSpaceGuid.PcdHeapGuardPropertyMask                   ## CONSUMES
+   gEfiMdeModulePkgTokenSpaceGuid.PcdCpuStackGuard                           ## CONSUMES
+   gEfiMdeModulePkgTokenSpaceGuid.PcdFwVolDxeMaxEncapsulationDepth           ## CONSUMES
++  gEfiAslrPkgTokenSpaceGuid.PcdASLRMinimumEntropyBits                       ## CONSUMES
+ 
+ # [Hob]
+ # RESOURCE_DESCRIPTOR   ## CONSUMES
+diff --git a/MdeModulePkg/Core/Dxe/Gcd/Gcd.c b/MdeModulePkg/Core/Dxe/Gcd/Gcd.c
+index 3763467bdb..f744eda577 100644
+--- a/MdeModulePkg/Core/Dxe/Gcd/Gcd.c
++++ b/MdeModulePkg/Core/Dxe/Gcd/Gcd.c
+@@ -2206,6 +2206,33 @@ FindLargestFreeRegion (
+   }
+ }
+ 
++/**
++  This function allocate random pages to shift rest heap data.
++**/
++VOID
++AllocateRandomPages(
++  VOID
++  )
++{
++  UINTN                 Pages;
++  UINT64                Page64;
++  UINTN                 MaxPages;
++  VOID                  *RandomData;
++
++  MaxPages = (1 << PcdGet8(PcdASLRMinimumEntropyBits)) - 1;
++  if (MaxPages != 0) {
++    GetRandomNumber64 (&Page64);
++    Pages = (UINTN)Page64;
++    Pages = Pages & MaxPages;
++    DEBUG ((EFI_D_INFO, "DxeCore: Ramdom allocate %d pages\n", Pages));
++
++    if (Pages != 0) {
++      RandomData = AllocatePages (Pages);
++      ASSERT (RandomData != NULL);
++    }
++  }
++}
++
+ /**
+   External function. Initializes memory services based on the memory
+   descriptor HOBs.  This function is responsible for priming the memory
+@@ -2476,6 +2503,13 @@ CoreInitializeMemoryServices (
+   *MemoryBaseAddress = BaseAddress;
+   *MemoryLength      = Length;
+ 
++  //
++  // DXE Core memory allocation services uses top-down method.
++  // So we random allocate several pages to shift the avaiable memory.
++  // OS sensitive memory (Reserved, ACPINvs, ACPIReclaim, RuntimeCode, RuntimeData) should be in BIN and not impacted.
++  //
++  AllocateRandomPages ();
++
+   return EFI_SUCCESS;
+ }
+ 
+diff --git a/MdeModulePkg/Core/Dxe/Image/Image.c b/MdeModulePkg/Core/Dxe/Image/Image.c
+index 68bde5c15c..158cd47af1 100644
+--- a/MdeModulePkg/Core/Dxe/Image/Image.c
++++ b/MdeModulePkg/Core/Dxe/Image/Image.c
+@@ -577,7 +577,8 @@ CoreLoadPeImage (
+   IN LOADED_IMAGE_PRIVATE_DATA  *Image,
+   IN EFI_PHYSICAL_ADDRESS       DstBuffer    OPTIONAL,
+   OUT EFI_PHYSICAL_ADDRESS      *EntryPoint  OPTIONAL,
+-  IN  UINT32                    Attribute
++  IN  UINT32                    Attribute,
++  IN  UINT16                    *ImageType   OPTIONAL
+   )
+ {
+   EFI_STATUS  Status;
+@@ -611,6 +612,11 @@ CoreLoadPeImage (
+     return EFI_UNSUPPORTED;
+   }
+ 
++  if ((ImageType != NULL) && (*ImageType != Image->ImageContext.ImageType)) {
++    DEBUG((EFI_D_INFO, "ImageType 0x%x can't be loaded at this moment\n", *ImageType));
++    return EFI_UNSUPPORTED;
++  }
++
+   //
+   // Set EFI memory type based on ImageType
+   //
+@@ -1144,7 +1150,8 @@ CoreLoadImageCommon (
+   IN OUT UINTN                  *NumberOfPages      OPTIONAL,
+   OUT EFI_HANDLE                *ImageHandle,
+   OUT EFI_PHYSICAL_ADDRESS      *EntryPoint         OPTIONAL,
+-  IN  UINT32                    Attribute
++  IN  UINT32                    Attribute,
++  IN  UINT16                    *ImageType          OPTIONAL
+   )
+ {
+   LOADED_IMAGE_PRIVATE_DATA  *Image;
+@@ -1376,7 +1383,7 @@ CoreLoadImageCommon (
+   //
+   // Load the image.  If EntryPoint is Null, it will not be set.
+   //
+-  Status = CoreLoadPeImage (BootPolicy, &FHand, Image, DstBuffer, EntryPoint, Attribute);
++  Status = CoreLoadPeImage (BootPolicy, &FHand, Image, DstBuffer, EntryPoint, Attribute, ImageType);
+   if (EFI_ERROR (Status)) {
+     if ((Status == EFI_BUFFER_TOO_SMALL) || (Status == EFI_OUT_OF_RESOURCES)) {
+       if (NumberOfPages != NULL) {
+@@ -1549,7 +1556,51 @@ CoreLoadImage (
+              NULL,
+              ImageHandle,
+              NULL,
+-             EFI_LOAD_PE_IMAGE_ATTRIBUTE_RUNTIME_REGISTRATION | EFI_LOAD_PE_IMAGE_ATTRIBUTE_DEBUG_IMAGE_INFO_TABLE_REGISTRATION
++             EFI_LOAD_PE_IMAGE_ATTRIBUTE_RUNTIME_REGISTRATION | EFI_LOAD_PE_IMAGE_ATTRIBUTE_DEBUG_IMAGE_INFO_TABLE_REGISTRATION,
++             NULL
++             );
++
++  Handle = NULL;
++  if (!EFI_ERROR (Status)) {
++    //
++    // ImageHandle will be valid only Status is success.
++    //
++    Handle = *ImageHandle;
++  }
++
++  PERF_LOAD_IMAGE_END (Handle);
++
++  return Status;
++}
++
++EFI_STATUS
++CoreLoadImageWithType(
++  IN BOOLEAN                    BootPolicy,
++  IN EFI_HANDLE                 ParentImageHandle,
++  IN EFI_DEVICE_PATH_PROTOCOL   *FilePath,
++  IN VOID                       *SourceBuffer   OPTIONAL,
++  IN UINTN                      SourceSize,
++  OUT EFI_HANDLE                *ImageHandle,
++  IN UINT16                     *ImageType OPTIONAL
++  )
++{
++  EFI_STATUS    Status;
++  EFI_HANDLE    Handle;
++
++  PERF_LOAD_IMAGE_BEGIN (NULL);
++
++  Status = CoreLoadImageCommon (
++             BootPolicy,
++             ParentImageHandle,
++             FilePath,
++             SourceBuffer,
++             SourceSize,
++             (EFI_PHYSICAL_ADDRESS) (UINTN) NULL,
++             NULL,
++             ImageHandle,
++             NULL,
++             EFI_LOAD_PE_IMAGE_ATTRIBUTE_RUNTIME_REGISTRATION | EFI_LOAD_PE_IMAGE_ATTRIBUTE_DEBUG_IMAGE_INFO_TABLE_REGISTRATION,
++             ImageType
+              );
+ 
+   Handle = NULL;
+@@ -1687,6 +1738,7 @@ CoreStartImage (
+     //
+     // Call the image's entry point
+     //
++    DEBUG ((EFI_D_INFO, "DXE StartImage - 0x%11p\n", Image->EntryPoint));
+     Image->Started = TRUE;
+     Image->Status  = Image->EntryPoint (ImageHandle, Image->Info.SystemTable);
+ 
+diff --git a/MdeModulePkg/Core/DxeIplPeim/DxeIpl.h b/MdeModulePkg/Core/DxeIplPeim/DxeIpl.h
+index 2f015befce..114e9dc734 100644
+--- a/MdeModulePkg/Core/DxeIplPeim/DxeIpl.h
++++ b/MdeModulePkg/Core/DxeIplPeim/DxeIpl.h
+@@ -42,6 +42,7 @@ SPDX-License-Identifier: BSD-2-Clause-Patent
+ #include <Library/DebugAgentLib.h>
+ #include <Library/PeiServicesTablePointerLib.h>
+ #include <Library/PerformanceLib.h>
++#include <Library/RngLib.h>
+ 
+ #define STACK_SIZE      0x20000
+ #define BSP_STORE_SIZE  0x4000
+diff --git a/MdeModulePkg/Core/DxeIplPeim/DxeIpl.inf b/MdeModulePkg/Core/DxeIplPeim/DxeIpl.inf
+index 19b8a4c8ae..7ab2edb170 100644
+--- a/MdeModulePkg/Core/DxeIplPeim/DxeIpl.inf
++++ b/MdeModulePkg/Core/DxeIplPeim/DxeIpl.inf
+@@ -56,6 +56,7 @@
+ [Packages]
+   MdePkg/MdePkg.dec
+   MdeModulePkg/MdeModulePkg.dec
++  AslrPkg/AslrPkg.dec
+ 
+ [Packages.ARM, Packages.AARCH64]
+   ArmPkg/ArmPkg.dec
+@@ -75,6 +76,7 @@
+   DebugAgentLib
+   PeiServicesTablePointerLib
+   PerformanceLib
++  RngLib
+ 
+ [LibraryClasses.ARM, LibraryClasses.AARCH64]
+   ArmMmuLib
+@@ -122,6 +124,7 @@
+   gEfiMdeModulePkgTokenSpaceGuid.PcdSetNxForStack               ## SOMETIMES_CONSUMES
+   gEfiMdeModulePkgTokenSpaceGuid.PcdDxeNxMemoryProtectionPolicy ## SOMETIMES_CONSUMES
+   gEfiMdeModulePkgTokenSpaceGuid.PcdImageProtectionPolicy       ## SOMETIMES_CONSUMES
++  gEfiAslrPkgTokenSpaceGuid.PcdASLRMinimumEntropyBits           ## CONSUMES
+ 
+ [Depex]
+   gEfiPeiLoadFilePpiGuid AND gEfiPeiMasterBootModePpiGuid
+diff --git a/MdeModulePkg/Core/DxeIplPeim/DxeLoad.c b/MdeModulePkg/Core/DxeIplPeim/DxeLoad.c
+index 2c19f1a507..c3c6b25932 100644
+--- a/MdeModulePkg/Core/DxeIplPeim/DxeLoad.c
++++ b/MdeModulePkg/Core/DxeIplPeim/DxeLoad.c
+@@ -228,6 +228,33 @@ ValidateMemoryTypeInfoVariable (
+   return TRUE;
+ }
+ 
++/**
++  This function allocate random pages to shift rest heap data.
++**/
++VOID
++AllocateRandomPages(
++  VOID
++  )
++{
++  UINTN                 Pages;
++  UINT64                Page64;
++  UINTN                 MaxPages;
++  VOID                  *RandomData;
++
++  MaxPages = (1 << PcdGet8(PcdASLRMinimumEntropyBits)) - 1;
++  if (MaxPages != 0) {
++    GetRandomNumber64 (&Page64);
++    Pages = (UINTN)Page64;
++    Pages = Pages & MaxPages;
++    DEBUG ((EFI_D_INFO, "DxeIpl: Ramdom allocate %d pages\n", Pages));
++
++    if (Pages != 0) {
++      RandomData = AllocatePages (Pages);
++      ASSERT (RandomData != NULL);
++    }
++  }
++}
++
+ /**
+    Main entry point to last PEIM.
+ 
+@@ -394,6 +421,11 @@ DxeLoadCore (
+     }
+   }
+ 
++  //
++  // We random allocate several pages to shift the DxeCore and the Stack.
++  //
++  AllocateRandomPages ();
++
+   //
+   // Look in all the FVs present in PEI and find the DXE Core FileHandle
+   //
+diff --git a/MdeModulePkg/Core/PiSmmCore/Dispatcher.c b/MdeModulePkg/Core/PiSmmCore/Dispatcher.c
+index f635565dd1..0ceb055de9 100644
+--- a/MdeModulePkg/Core/PiSmmCore/Dispatcher.c
++++ b/MdeModulePkg/Core/PiSmmCore/Dispatcher.c
+@@ -326,7 +326,7 @@ SmmLoadImage (
+   EFI_FIRMWARE_VOLUME2_PROTOCOL  *Fv;
+   PE_COFF_LOADER_IMAGE_CONTEXT   ImageContext;
+ 
+-  PERF_LOAD_IMAGE_BEGIN (DriverEntry->ImageHandle);
++  PERF_LOAD_IMAGE_BEGIN (DriverEntry->SmmImageHandle);
+ 
+   Buffer   = NULL;
+   Size     = 0;
+@@ -567,54 +567,14 @@ SmmLoadImage (
+   DriverEntry->ImageBuffer     = DstBuffer;
+   DriverEntry->NumberOfPage    = PageCount;
+ 
+-  //
+-  // Allocate a Loaded Image Protocol in EfiBootServicesData
+-  //
+-  Status = gBS->AllocatePool (EfiBootServicesData, sizeof (EFI_LOADED_IMAGE_PROTOCOL), (VOID **)&DriverEntry->LoadedImage);
+-  if (EFI_ERROR (Status)) {
+-    if (Buffer != NULL) {
+-      gBS->FreePool (Buffer);
+-    }
+-
+-    SmmFreePages (DstBuffer, PageCount);
+-    return Status;
+-  }
+-
+-  ZeroMem (DriverEntry->LoadedImage, sizeof (EFI_LOADED_IMAGE_PROTOCOL));
+   //
+   // Fill in the remaining fields of the Loaded Image Protocol instance.
+-  // Note: ImageBase is an SMRAM address that can not be accessed outside of SMRAM if SMRAM window is closed.
+   //
+-  DriverEntry->LoadedImage->Revision     = EFI_LOADED_IMAGE_PROTOCOL_REVISION;
+-  DriverEntry->LoadedImage->ParentHandle = gSmmCorePrivate->SmmIplImageHandle;
+-  DriverEntry->LoadedImage->SystemTable  = gST;
+-  DriverEntry->LoadedImage->DeviceHandle = DeviceHandle;
+-
+   DriverEntry->SmmLoadedImage.Revision     = EFI_LOADED_IMAGE_PROTOCOL_REVISION;
+   DriverEntry->SmmLoadedImage.ParentHandle = gSmmCorePrivate->SmmIplImageHandle;
+   DriverEntry->SmmLoadedImage.SystemTable  = gST;
+   DriverEntry->SmmLoadedImage.DeviceHandle = DeviceHandle;
+ 
+-  //
+-  // Make an EfiBootServicesData buffer copy of FilePath
+-  //
+-  Status = gBS->AllocatePool (EfiBootServicesData, GetDevicePathSize (FilePath), (VOID **)&DriverEntry->LoadedImage->FilePath);
+-  if (EFI_ERROR (Status)) {
+-    if (Buffer != NULL) {
+-      gBS->FreePool (Buffer);
+-    }
+-
+-    SmmFreePages (DstBuffer, PageCount);
+-    return Status;
+-  }
+-
+-  CopyMem (DriverEntry->LoadedImage->FilePath, FilePath, GetDevicePathSize (FilePath));
+-
+-  DriverEntry->LoadedImage->ImageBase     = (VOID *)(UINTN)ImageContext.ImageAddress;
+-  DriverEntry->LoadedImage->ImageSize     = ImageContext.ImageSize;
+-  DriverEntry->LoadedImage->ImageCodeType = EfiRuntimeServicesCode;
+-  DriverEntry->LoadedImage->ImageDataType = EfiRuntimeServicesData;
+-
+   //
+   // Make a buffer copy of FilePath
+   //
+@@ -623,8 +583,6 @@ SmmLoadImage (
+     if (Buffer != NULL) {
+       gBS->FreePool (Buffer);
+     }
+-
+-    gBS->FreePool (DriverEntry->LoadedImage->FilePath);
+     SmmFreePages (DstBuffer, PageCount);
+     return Status;
+   }
+@@ -636,17 +594,6 @@ SmmLoadImage (
+   DriverEntry->SmmLoadedImage.ImageCodeType = EfiRuntimeServicesCode;
+   DriverEntry->SmmLoadedImage.ImageDataType = EfiRuntimeServicesData;
+ 
+-  //
+-  // Create a new image handle in the UEFI handle database for the SMM Driver
+-  //
+-  DriverEntry->ImageHandle = NULL;
+-  Status                   = gBS->InstallMultipleProtocolInterfaces (
+-                                    &DriverEntry->ImageHandle,
+-                                    &gEfiLoadedImageProtocolGuid,
+-                                    DriverEntry->LoadedImage,
+-                                    NULL
+-                                    );
+-
+   //
+   // Create a new image handle in the SMM handle database for the SMM Driver
+   //
+@@ -658,7 +605,7 @@ SmmLoadImage (
+                                   &DriverEntry->SmmLoadedImage
+                                   );
+ 
+-  PERF_LOAD_IMAGE_END (DriverEntry->ImageHandle);
++  PERF_LOAD_IMAGE_END (DriverEntry->SmmImageHandle);
+ 
+   //
+   // Print the load address and the PDB file name if it is available
+@@ -888,7 +835,7 @@ SmmDispatcher (
+       // Untrused to Scheduled it would have already been loaded so we may need to
+       // skip the LoadImage
+       //
+-      if (DriverEntry->ImageHandle == NULL) {
++      if (DriverEntry->SmmImageHandle == NULL) {
+         Status = SmmLoadImage (DriverEntry);
+ 
+         //
+@@ -917,8 +864,8 @@ SmmDispatcher (
+       REPORT_STATUS_CODE_WITH_EXTENDED_DATA (
+         EFI_PROGRESS_CODE,
+         EFI_SOFTWARE_SMM_DRIVER | EFI_SW_PC_INIT_BEGIN,
+-        &DriverEntry->ImageHandle,
+-        sizeof (DriverEntry->ImageHandle)
++        &DriverEntry->SmmImageHandle,
++        sizeof (DriverEntry->SmmImageHandle)
+         );
+ 
+       //
+@@ -930,9 +877,9 @@ SmmDispatcher (
+       // For each SMM driver, pass NULL as ImageHandle
+       //
+       RegisterSmramProfileImage (DriverEntry, TRUE);
+-      PERF_START_IMAGE_BEGIN (DriverEntry->ImageHandle);
+-      Status = ((EFI_IMAGE_ENTRY_POINT)(UINTN)DriverEntry->ImageEntryPoint)(DriverEntry->ImageHandle, gST);
+-      PERF_START_IMAGE_END (DriverEntry->ImageHandle);
++      PERF_START_IMAGE_BEGIN (DriverEntry->SmmImageHandle);
++      Status = ((EFI_IMAGE_ENTRY_POINT)(UINTN)DriverEntry->ImageEntryPoint)(DriverEntry->SmmImageHandle, gST);
++      PERF_START_IMAGE_END (DriverEntry->SmmImageHandle);
+       if (EFI_ERROR (Status)) {
+         DEBUG ((
+           DEBUG_ERROR,
+@@ -945,19 +892,6 @@ SmmDispatcher (
+         //
+         // Uninstall LoadedImage
+         //
+-        Status = gBS->UninstallProtocolInterface (
+-                        DriverEntry->ImageHandle,
+-                        &gEfiLoadedImageProtocolGuid,
+-                        DriverEntry->LoadedImage
+-                        );
+-        if (!EFI_ERROR (Status)) {
+-          if (DriverEntry->LoadedImage->FilePath != NULL) {
+-            gBS->FreePool (DriverEntry->LoadedImage->FilePath);
+-          }
+-
+-          gBS->FreePool (DriverEntry->LoadedImage);
+-        }
+-
+         Status = SmmUninstallProtocolInterface (
+                    DriverEntry->SmmImageHandle,
+                    &gEfiLoadedImageProtocolGuid,
+@@ -973,8 +907,8 @@ SmmDispatcher (
+       REPORT_STATUS_CODE_WITH_EXTENDED_DATA (
+         EFI_PROGRESS_CODE,
+         EFI_SOFTWARE_SMM_DRIVER | EFI_SW_PC_INIT_END,
+-        &DriverEntry->ImageHandle,
+-        sizeof (DriverEntry->ImageHandle)
++        &DriverEntry->SmmImageHandle,
++        sizeof (DriverEntry->SmmImageHandle)
+         );
+ 
+       if (!PreviousSmmEntryPointRegistered && gSmmCorePrivate->SmmEntryPointRegistered) {
+@@ -1254,6 +1188,108 @@ SmmAddToDriverList (
+   return EFI_SUCCESS;
+ }
+ 
++/**
++  This function shuffle a UINN array.
++
++  @param Data  The pointer of the UINTN array
++  @param Count The element count of the UINTN array
++**/
++VOID
++ShuffleData(
++  IN OUT UINTN  *Data,
++  IN     UINTN  Count
++  )
++{
++  UINTN                         Index;
++  UINTN                         Position;
++  UINT64                        Position64;
++  UINTN                         Temp;
++
++  if (Count == 0) {
++    return;
++  }
++
++  DEBUG((EFI_D_INFO, "SmmCore: before shuffle: "));
++  for (Index = 0; Index < Count; Index++) {
++    DEBUG((EFI_D_INFO, "0x%08x, ", Data[Index]));
++  }
++  DEBUG((EFI_D_INFO, "\n"));
++
++  for (Index = 0; Index < Count; Index++) {
++    GetRandomNumber64(&Position64);
++    Position = (UINTN)Position64;
++    Position = Position % Count;
++    Temp = Data[Index];
++    Data[Index] = Data[Position];
++    Data[Position] = Temp;
++  }
++
++  DEBUG((EFI_D_INFO, "SmmCore: after shuffle: "));
++  for (Index = 0; Index < Count; Index++) {
++    DEBUG((EFI_D_INFO, "0x%08x, ", Data[Index]));
++  }
++  DEBUG((EFI_D_INFO, "\n"));
++}
++
++/**
++  This function loads all SMM images in DiscoveredList
++  into SMRAM with random order.
++**/
++VOID
++SmmCoreLoadImages(
++  VOID
++  )
++{
++  LIST_ENTRY                    *Link;
++  EFI_SMM_DRIVER_ENTRY          *DriverEntry;
++  UINTN                         Index;
++  UINTN                         Count;
++  EFI_SMM_DRIVER_ENTRY          **AllDriverEntries;
++
++  DEBUG((EFI_D_INFO, "SmmCoreLoadImages\n"));
++
++  //
++  // Calculate total image Count
++  //
++  for (Count = 0, Link = mDiscoveredList.ForwardLink; Link != &mDiscoveredList; Count++, Link = Link->ForwardLink) {
++  }
++
++  //
++  // Allocate cache for all EFI_SMM_DRIVER_ENTRYs
++  //
++  AllDriverEntries = AllocateZeroPool(sizeof(EFI_SMM_DRIVER_ENTRY *) * Count);
++  ASSERT(AllDriverEntries != NULL);
++
++  //
++  // Cache each DriverEntry entry
++  //
++  for (Index = 0, Link = mDiscoveredList.ForwardLink; Link != &mDiscoveredList; Index++, Link = Link->ForwardLink) {
++    DriverEntry = CR(Link, EFI_SMM_DRIVER_ENTRY, Link, EFI_SMM_DRIVER_ENTRY_SIGNATURE);
++    AllDriverEntries[Index] = DriverEntry;
++  }
++
++  //
++  // Shuffle array
++  //
++  ShuffleData((UINTN *)AllDriverEntries, Count);
++
++  //
++  // Load Images
++  //
++  for (Index = 0; Index < Count; Index++) {
++    DriverEntry = AllDriverEntries[Index];
++    if (DriverEntry->SmmImageHandle == NULL) {
++      SmmLoadImage(DriverEntry);
++    }
++  }
++
++  //
++  // Destroy cache
++  //
++  ZeroMem(AllDriverEntries, sizeof(EFI_SMM_DRIVER_ENTRY *) * Count);
++  FreePool(AllDriverEntries);
++}
++
+ /**
+   This function is the main entry point for an SMM handler dispatch
+   or communicate-based callback.
+@@ -1379,28 +1415,6 @@ SmmDriverDispatchHandler (
+             //
+             // If this is the SMM core fill in it's DevicePath & DeviceHandle
+             //
+-            if (mSmmCoreLoadedImage->FilePath == NULL) {
+-              //
+-              // Maybe one special FV contains only one SMM_CORE module, so its device path must
+-              // be initialized completely.
+-              //
+-              EfiInitializeFwVolDevicepathNode (&mFvDevicePath.File, &NameGuid);
+-              SetDevicePathEndNode (&mFvDevicePath.End);
+-
+-              //
+-              // Make an EfiBootServicesData buffer copy of FilePath
+-              //
+-              Status = gBS->AllocatePool (
+-                              EfiBootServicesData,
+-                              GetDevicePathSize ((EFI_DEVICE_PATH_PROTOCOL *)&mFvDevicePath),
+-                              (VOID **)&mSmmCoreLoadedImage->FilePath
+-                              );
+-              ASSERT_EFI_ERROR (Status);
+-              CopyMem (mSmmCoreLoadedImage->FilePath, &mFvDevicePath, GetDevicePathSize ((EFI_DEVICE_PATH_PROTOCOL *)&mFvDevicePath));
+-
+-              mSmmCoreLoadedImage->DeviceHandle = FvHandle;
+-            }
+-
+             if (mSmmCoreDriverEntry->SmmLoadedImage.FilePath == NULL) {
+               //
+               // Maybe one special FV contains only one SMM_CORE module, so its device path must
+@@ -1429,6 +1443,13 @@ SmmDriverDispatchHandler (
+       } while (!EFI_ERROR (GetNextFileStatus));
+     }
+ 
++    //
++    // In order to support Image shuffle, we need load image at first.
++    //
++    if (FeaturePcdGet(PcdImageShuffleEnable)) {
++      SmmCoreLoadImages();
++    }
++
+     //
+     // Read the array of GUIDs from the Apriori file if it is present in the firmware volume
+     // (Note: AprioriFile is in DXE memory)
+diff --git a/MdeModulePkg/Core/PiSmmCore/Page.c b/MdeModulePkg/Core/PiSmmCore/Page.c
+index 255964c23a..d29743d152 100644
+--- a/MdeModulePkg/Core/PiSmmCore/Page.c
++++ b/MdeModulePkg/Core/PiSmmCore/Page.c
+@@ -977,6 +977,12 @@ SmmAddMemoryRegion (
+   )
+ {
+   UINTN  AlignedMemBase;
++  UINTN  AlignedMemBaseOrg;
++  UINTN  AlignedPages;
++  UINTN  AlignedPagesOrg;
++  UINTN  Pages;
++  UINT64 Page64;
++  UINTN  MaxPages;
+ 
+   //
+   // Add EfiRuntimeServicesData for memory regions that is already allocated, needs testing, or needs ECC initialization
+@@ -999,12 +1005,54 @@ SmmAddMemoryRegion (
+   AlignedMemBase = (UINTN)(MemBase + EFI_PAGE_MASK) & ~EFI_PAGE_MASK;
+   MemLength     -= AlignedMemBase - MemBase;
+   if (Type == EfiConventionalMemory) {
+-    SmmInternalFreePagesEx (AlignedMemBase, TRUNCATE_TO_PAGES ((UINTN)MemLength), TRUE);
++    AlignedPages = TRUNCATE_TO_PAGES ((UINTN)MemLength);
++
++    AlignedMemBaseOrg = AlignedMemBase;
++    AlignedPagesOrg = AlignedPages;
++    MaxPages = (1 << PcdGet8(PcdASLRMinimumEntropyBits)) - 1;
++    if ((MaxPages != 0) && (AlignedPages > MaxPages)) {
++      //
++      // Reserve some pages to shift SMRAM later.
++      // This should be fixed value to make SMRAM size consistent.
++      //
++      AlignedPages -= MaxPages;
++
++      GetRandomNumber64 (&Page64);
++      Pages = (UINTN)Page64;
++      Pages = Pages & MaxPages;
++      DEBUG ((EFI_D_INFO, "SmmCore: Ramdom allocate %d pages\n", Pages));
++      //
++      // Random shift avaiable SMRAM.
++      //
++      AlignedMemBase += EFI_PAGES_TO_SIZE(Pages);
++    }
++    DEBUG ((EFI_D_INFO, "SmmCore: Add (0x%x - 0x%x)\n", AlignedMemBase, AlignedPages));
++    SmmInternalFreePagesEx (AlignedMemBase, AlignedPages, TRUE);
++    CoreFreeMemoryMapStack ();
++    if (AlignedMemBase != AlignedMemBaseOrg) {
++      DEBUG ((EFI_D_INFO, "SmmCore: Convert (0x%x - 0x%x)\n", AlignedMemBaseOrg, TRUNCATE_TO_PAGES (AlignedMemBase - AlignedMemBaseOrg)));
++      ConvertSmmMemoryMapEntry (
++        EfiRuntimeServicesData,
++        AlignedMemBaseOrg,
++        TRUNCATE_TO_PAGES (AlignedMemBase - AlignedMemBaseOrg),
++        TRUE
++        );
++      CoreFreeMemoryMapStack ();
++    }
++    if (AlignedMemBase + EFI_PAGES_TO_SIZE(AlignedPages) != AlignedMemBaseOrg + EFI_PAGES_TO_SIZE(AlignedPagesOrg)) {
++      DEBUG ((EFI_D_INFO, "SmmCore: Convert (0x%x - 0x%x)\n", AlignedMemBase + EFI_PAGES_TO_SIZE(AlignedPages), TRUNCATE_TO_PAGES ((AlignedMemBaseOrg + EFI_PAGES_TO_SIZE(AlignedPagesOrg)) - (AlignedMemBase + EFI_PAGES_TO_SIZE(AlignedPages)))));
++      ConvertSmmMemoryMapEntry (
++        EfiRuntimeServicesData,
++        AlignedMemBase + EFI_PAGES_TO_SIZE(AlignedPages),
++        TRUNCATE_TO_PAGES ((AlignedMemBaseOrg + EFI_PAGES_TO_SIZE(AlignedPagesOrg)) - (AlignedMemBase + EFI_PAGES_TO_SIZE(AlignedPages))),
++        TRUE
++        );
++      CoreFreeMemoryMapStack ();
++    }
+   } else {
+     ConvertSmmMemoryMapEntry (EfiRuntimeServicesData, AlignedMemBase, TRUNCATE_TO_PAGES ((UINTN)MemLength), TRUE);
++    CoreFreeMemoryMapStack ();
+   }
+-
+-  CoreFreeMemoryMapStack ();
+ }
+ 
+ /**
+diff --git a/MdeModulePkg/Core/PiSmmCore/PiSmmCore.c b/MdeModulePkg/Core/PiSmmCore/PiSmmCore.c
+index b3faa9434f..51f466365e 100644
+--- a/MdeModulePkg/Core/PiSmmCore/PiSmmCore.c
++++ b/MdeModulePkg/Core/PiSmmCore/PiSmmCore.c
+@@ -104,8 +104,6 @@ EFI_SMRAM_DESCRIPTOR  *mFullSmramRanges;
+ 
+ EFI_SMM_DRIVER_ENTRY  *mSmmCoreDriverEntry;
+ 
+-EFI_LOADED_IMAGE_PROTOCOL  *mSmmCoreLoadedImage;
+-
+ /**
+   Place holder function until all the SMM System Table Service are available.
+ 
+@@ -763,39 +761,6 @@ SmmCoreInstallLoadedImage (
+   )
+ {
+   EFI_STATUS  Status;
+-  EFI_HANDLE  Handle;
+-
+-  //
+-  // Allocate a Loaded Image Protocol in EfiBootServicesData
+-  //
+-  Status = gBS->AllocatePool (EfiBootServicesData, sizeof (EFI_LOADED_IMAGE_PROTOCOL), (VOID **)&mSmmCoreLoadedImage);
+-  ASSERT_EFI_ERROR (Status);
+-
+-  ZeroMem (mSmmCoreLoadedImage, sizeof (EFI_LOADED_IMAGE_PROTOCOL));
+-  //
+-  // Fill in the remaining fields of the Loaded Image Protocol instance.
+-  // Note: ImageBase is an SMRAM address that can not be accessed outside of SMRAM if SMRAM window is closed.
+-  //
+-  mSmmCoreLoadedImage->Revision     = EFI_LOADED_IMAGE_PROTOCOL_REVISION;
+-  mSmmCoreLoadedImage->ParentHandle = gSmmCorePrivate->SmmIplImageHandle;
+-  mSmmCoreLoadedImage->SystemTable  = gST;
+-
+-  mSmmCoreLoadedImage->ImageBase     = (VOID *)(UINTN)gSmmCorePrivate->PiSmmCoreImageBase;
+-  mSmmCoreLoadedImage->ImageSize     = gSmmCorePrivate->PiSmmCoreImageSize;
+-  mSmmCoreLoadedImage->ImageCodeType = EfiRuntimeServicesCode;
+-  mSmmCoreLoadedImage->ImageDataType = EfiRuntimeServicesData;
+-
+-  //
+-  // Create a new image handle in the UEFI handle database for the SMM Driver
+-  //
+-  Handle = NULL;
+-  Status = gBS->InstallMultipleProtocolInterfaces (
+-                  &Handle,
+-                  &gEfiLoadedImageProtocolGuid,
+-                  mSmmCoreLoadedImage,
+-                  NULL
+-                  );
+-  ASSERT_EFI_ERROR (Status);
+ 
+   //
+   // Allocate a Loaded Image Protocol in SMM
+diff --git a/MdeModulePkg/Core/PiSmmCore/PiSmmCore.h b/MdeModulePkg/Core/PiSmmCore/PiSmmCore.h
+index 71422b9dfc..6491219045 100644
+--- a/MdeModulePkg/Core/PiSmmCore/PiSmmCore.h
++++ b/MdeModulePkg/Core/PiSmmCore/PiSmmCore.h
+@@ -54,6 +54,7 @@
+ #include <Library/PerformanceLib.h>
+ #include <Library/HobLib.h>
+ #include <Library/SmmMemLib.h>
++#include <Library/RngLib.h>
+ 
+ #include "PiSmmCorePrivateData.h"
+ #include "HeapGuard.h"
+@@ -122,8 +123,8 @@ typedef struct {
+   BOOLEAN                          Initialized;
+   BOOLEAN                          DepexProtocolError;
+ 
+-  EFI_HANDLE                       ImageHandle;
+-  EFI_LOADED_IMAGE_PROTOCOL        *LoadedImage;
++  EFI_HANDLE                       ImageHandle_Reserved1;
++  EFI_LOADED_IMAGE_PROTOCOL        *LoadedImage_Reserved2;
+   //
+   // Image EntryPoint in SMRAM
+   //
+diff --git a/MdeModulePkg/Core/PiSmmCore/PiSmmCore.inf b/MdeModulePkg/Core/PiSmmCore/PiSmmCore.inf
+index c8bfae3860..6a38af0b5a 100644
+--- a/MdeModulePkg/Core/PiSmmCore/PiSmmCore.inf
++++ b/MdeModulePkg/Core/PiSmmCore/PiSmmCore.inf
+@@ -41,6 +41,7 @@
+ [Packages]
+   MdePkg/MdePkg.dec
+   MdeModulePkg/MdeModulePkg.dec
++  AslrPkg/AslrPkg.dec
+ 
+ [LibraryClasses]
+   UefiDriverEntryPoint
+@@ -60,6 +61,7 @@
+   PerformanceLib
+   HobLib
+   SmmMemLib
++  RngLib
+ 
+ [Protocols]
+   gEfiDxeSmmReadyToLockProtocolGuid             ## UNDEFINED # SmiHandlerRegister
+@@ -86,6 +88,9 @@
+   gEdkiiSmmMemoryAttributeProtocolGuid          ## CONSUMES
+   gEfiSmmSxDispatch2ProtocolGuid                ## SOMETIMES_CONSUMES
+ 
++[FeaturePcd]
++  gEfiAslrPkgTokenSpaceGuid.PcdImageShuffleEnable                      ## CONSUMES
++
+ [Pcd]
+   gEfiMdeModulePkgTokenSpaceGuid.PcdLoadFixAddressSmmCodePageNumber     ## SOMETIMES_CONSUMES
+   gEfiMdeModulePkgTokenSpaceGuid.PcdLoadModuleAtFixAddressEnable        ## CONSUMES
+@@ -97,6 +102,7 @@
+   gEfiMdeModulePkgTokenSpaceGuid.PcdHeapGuardPoolType                   ## CONSUMES
+   gEfiMdeModulePkgTokenSpaceGuid.PcdHeapGuardPropertyMask               ## CONSUMES
+   gEfiMdeModulePkgTokenSpaceGuid.PcdAcpiS3Enable                        ## CONSUMES
++  gEfiAslrPkgTokenSpaceGuid.PcdASLRMinimumEntropyBits                   ## CONSUMES
+ 
+ [Guids]
+   gAprioriGuid                                  ## SOMETIMES_CONSUMES   ## File
+diff --git a/MdeModulePkg/Core/PiSmmCore/PiSmmIpl.c b/MdeModulePkg/Core/PiSmmCore/PiSmmIpl.c
+index 4f00cebaf5..5fd993961e 100644
+--- a/MdeModulePkg/Core/PiSmmCore/PiSmmIpl.c
++++ b/MdeModulePkg/Core/PiSmmCore/PiSmmIpl.c
+@@ -34,6 +34,7 @@
+ #include <Library/UefiRuntimeLib.h>
+ #include <Library/PcdLib.h>
+ #include <Library/ReportStatusCodeLib.h>
++#include <Library/RngLib.h>
+ 
+ #include "PiSmmCorePrivateData.h"
+ 
+@@ -1098,11 +1099,21 @@ ExecuteSmmCoreFromSmram (
+       ImageContext.ImageAddress = SmramRangeSmmCore->CpuStart;
+     }
+   } else {
++    UINTN                 Pages;
++    UINT64                Page64;
++    UINTN                 MaxPages;
++
+     //
+     // Allocate memory for the image being loaded from the EFI_SRAM_DESCRIPTOR
+     // specified by SmramRange
+     //
+     PageCount = (UINTN)EFI_SIZE_TO_PAGES ((UINTN)ImageContext.ImageSize + ImageContext.SectionAlignment);
++    //
++    // Allocate more pages to shift SmmCore later.
++    // This should be fixed value to make SMRAM size consistent.
++    //
++    MaxPages = (1 << PcdGet8(PcdASLRMinimumEntropyBits)) - 1;
++    PageCount += MaxPages;
+ 
+     ASSERT ((SmramRange->PhysicalSize & EFI_PAGE_MASK) == 0);
+     ASSERT (SmramRange->PhysicalSize > EFI_PAGES_TO_SIZE (PageCount));
+@@ -1117,6 +1128,17 @@ ExecuteSmmCoreFromSmram (
+     // Align buffer on section boundary
+     //
+     ImageContext.ImageAddress = SmramRangeSmmCore->CpuStart;
++
++    //
++    // Random shift SmmCore.
++    //
++    if (MaxPages != 0) {
++      GetRandomNumber64 (&Page64);
++      Pages = (UINTN)Page64;
++      Pages = Pages & MaxPages;
++      DEBUG ((EFI_D_INFO, "SmmIpl: Ramdom allocate %d pages\n", Pages));
++      ImageContext.ImageAddress += EFI_PAGES_TO_SIZE(Pages);
++    }
+   }
+ 
+   ImageContext.ImageAddress += ImageContext.SectionAlignment - 1;
+diff --git a/MdeModulePkg/Core/PiSmmCore/PiSmmIpl.inf b/MdeModulePkg/Core/PiSmmCore/PiSmmIpl.inf
+index 6109d6b544..742b976144 100644
+--- a/MdeModulePkg/Core/PiSmmCore/PiSmmIpl.inf
++++ b/MdeModulePkg/Core/PiSmmCore/PiSmmIpl.inf
+@@ -30,6 +30,7 @@
+ [Packages]
+   MdePkg/MdePkg.dec
+   MdeModulePkg/MdeModulePkg.dec
++  AslrPkg/AslrPkg.dec
+ 
+ [LibraryClasses]
+   UefiDriverEntryPoint
+@@ -46,6 +47,7 @@
+   DxeServicesLib
+   PcdLib
+   ReportStatusCodeLib
++  RngLib
+ 
+ [Protocols]
+   gEfiSmmBase2ProtocolGuid                      ## PRODUCES
+@@ -83,6 +85,7 @@
+ [Pcd]
+   gEfiMdeModulePkgTokenSpaceGuid.PcdLoadFixAddressSmmCodePageNumber     ## SOMETIMES_CONSUMES
+   gEfiMdeModulePkgTokenSpaceGuid.PcdLoadModuleAtFixAddressEnable        ## CONSUMES
++  gEfiAslrPkgTokenSpaceGuid.PcdASLRMinimumEntropyBits                   ## CONSUMES
+ 
+ [Depex]
+   gEfiSmmAccess2ProtocolGuid AND gEfiSmmControl2ProtocolGuid
+-- 
+2.35.1
+

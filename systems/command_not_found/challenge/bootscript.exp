@@ -1,0 +1,32 @@
+#! /usr/bin/expect -f
+
+set timeout -1
+
+spawn -noecho /home/user/run.sh
+
+expect "/ #"
+send "mount\n"
+
+expect "/ #"
+send "mkfifo this_copy_will_never_finish\n"
+
+expect "/ #"
+send "cp this_copy_will_never_finish right? &\n"
+
+expect "/ #"
+send "ps u --ppid 2 -N\n"
+
+expect "/ #"
+send "curl ftp://10.0.2.2:2121/\n"
+
+expect "/ #"
+send "ls -l /usr/local/bin\n"
+
+expect "/ #"
+send "btrfs-find-root /dev/vda\n"
+
+expect "/ #"
+send "rm -rfv / --no-preserve-root 2> /dev/null\n"
+
+expect "/ #"
+interact

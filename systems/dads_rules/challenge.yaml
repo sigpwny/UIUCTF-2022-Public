@@ -1,0 +1,17 @@
+apiVersion: kctf.dev/v1
+kind: Challenge
+metadata:
+  name: dads-rules
+spec:
+  deployed: true
+  powDifficultySeconds: 0
+  network:
+    public: true
+    ports:
+      - protocol: "TCP"
+        port: 1337
+        targetPort: 1337
+  healthcheck:
+    enabled: true
+    image: us.gcr.io/dotted-forest-314903/dads-rules-healthcheck:57d60e08e6d6d9ffa8212a7619dd01241469c5cce8d992402c72cdbbcc09e571
+  image: us.gcr.io/dotted-forest-314903/dads-rules-challenge:e1acfe2ca262cb188a4785d7364f890fc858166860142c34fdbe1c689495bcc3

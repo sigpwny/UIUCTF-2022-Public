@@ -1,0 +1,20 @@
+apiVersion: kctf.dev/v1
+kind: Challenge
+metadata:
+  name: mom-can-we-have-aes
+spec:
+  deployed: true
+  powDifficultySeconds: 0
+  network:
+    public: true
+    ports:
+      - protocol: "TCP"
+        port: 1337
+        targetPort: 1337
+      - protocol: "TCP"
+        port: 1338
+        targetPort: 1338
+  healthcheck:
+    enabled: true
+    image: us.gcr.io/dotted-forest-314903/mom-can-we-have-aes-healthcheck:86a4e26ee32351e33424b1d47457efba94203774a18b47a24b05970af92836bf
+  image: us.gcr.io/dotted-forest-314903/mom-can-we-have-aes-challenge:b0c4a0c8dfb513807765e536fee52bd45d83283ecbf498f21881102d5396e3e3

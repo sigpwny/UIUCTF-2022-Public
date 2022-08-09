@@ -1,0 +1,20 @@
+name: "Vast Cornfields"
+author: "spamakin"
+category: rev
+description: |-
+  Iterative functions are sooooooo last year. All the cool kids are keeping secrets with recursion nowadays
+
+  **author:** Spamakin
+value: 500
+type: dynamic
+extra:
+  initial: 500
+  decay: 75
+  minimum: 50
+flags:
+  - uiuctf{the_inside_of_a_field_of_corn_and_dreams}
+tags:
+  - rev
+files:
+  - challenge/vast_cornfields
+state: hidden

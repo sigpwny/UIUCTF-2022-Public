@@ -1,0 +1,17 @@
+apiVersion: kctf.dev/v1
+kind: Challenge
+metadata:
+  name: military-grade-encryption
+spec:
+  deployed: true
+  powDifficultySeconds: 0
+  network:
+    public: true
+    ports:
+      - protocol: "HTTPS"
+        targetPort: 1337
+  healthcheck:
+    # TIP: disable the healthcheck during development
+    enabled: true
+    image: us.gcr.io/dotted-forest-314903/military-grade-encryption-healthcheck:a547bd1a89ae62cec70c7ede1da5033661a519bd3ce6deafd5b583f810d330bb
+  image: us.gcr.io/dotted-forest-314903/military-grade-encryption-challenge:cc4f00aa9f1170844a6facada08a749891ffe14bc41f0f7a54366529babbe1d3

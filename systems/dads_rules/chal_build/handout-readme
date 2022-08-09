@@ -1,0 +1,19 @@
+This directory contains:
+
+- chal_build: The files used to build the challenge.
+- run: Pre-built files in case you want to run the challenge locally. This is
+  the same copy of the challenge running on the server.
+
+The actual challenge runs a jail utilizing many Linux namespaces for isolation.
+The shell you interact with is inside the jail. There's a somewhat convoluted
+dance during the namespace setup; the purpose of that is so the shell you
+interact with has all capabilities of its userns, which at the same time also
+owns the netns of the jail. This is so you are able to send raw packets to the
+network interfaces inside the jail.
+
+It might be difficult to debug and see what is happening outside the jail, so
+an alternative build "nojail" is offered in addition to the "jail" build. You
+can inspect what's going on in other netns via `ip netns exec` command in this
+build.
+
+Due to reasons, the pre-built kernel here requires a minimum of QEMU v6.2.0

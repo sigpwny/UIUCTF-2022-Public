@@ -1,0 +1,21 @@
+name: "Everyone's A Critic 6"
+author: "Thomas"
+category: osint
+description: "There is a video game reviews content creator who has somehow ended up reviewing UIUCTF, make sure their reviews are not too harsh by investigating them!. Chuck hid one last piece of information that may expose him forever, can you find it!?"
+value: 500
+type: dynamic
+extra:
+  initial: 500
+  decay: 75
+  minimum: 50
+flags:
+    - uiuctf{n0t_@_kn1f3!}
+tags:
+    - osint
+hints:
+    - The first two characters of the flag after uiuctf{ are `n0`
+state: hidden
+
+# Specifies what version of the challenge specification was used.
+# Subject to change until ctfcli v1.0.0
+version: "0.1"

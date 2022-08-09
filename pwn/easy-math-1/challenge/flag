@@ -1,0 +1,6 @@
+Nice job! Now, the question is, did you do it the fun way, or by hiding behind your ssh client?
+
+Part 1 flag: uiuctf{now do it the fun way :D}
+
+To solve part 2, use `ssh ctf-part-2@easy-math.chal.uiuc.tf` (password is still ctf)
+This time, your input is sent in live, but you don't get any output until after your shell exits.

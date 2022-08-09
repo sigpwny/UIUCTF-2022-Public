@@ -1,0 +1,30 @@
+name: "Sussy ML"
+author: "SahilJain"
+category: misc
+description: |-
+  Top scientists in Among Us have finally delivered the impossible; A method to classify the SUS with perfect accuracy.
+  To solve amogus once and for all, they needed to suss out the sus *at scale*, and thus created a Neural Network classifier for crewmate images that achieved 100% accuracy over the population, which has a 'sus' rate of less than 5%.
+
+  However, among the `us` lurked a final sus, who destroyed the back half of the fully trained model (where the classification head and some convolutional layers were), and now the sus epidemic looms large again.
+
+  With the partial model left over from the fully trained model, figure out; Who. Is. Sus?
+
+  Flag format is `uiuctf{n1_n2_n3_...}`  
+  where `n#` is the numbers that are sus sorted in ascending order. Each image has a number in the filename. For example, if 001.png, 005.png, and 010.png are sus, the flag would be `uiuctf{1_5_10}`
+
+  **author**: SahilJain
+value: 500
+type: dynamic
+extra:
+  initial: 500
+  decay: 75
+  minimum: 50
+flags:
+  - uiuctf{2_31_41_59_65}
+tags:
+  - misc
+  - ml
+files:
+  - sussy.tar.gz
+state: visible
+version: "0.1"

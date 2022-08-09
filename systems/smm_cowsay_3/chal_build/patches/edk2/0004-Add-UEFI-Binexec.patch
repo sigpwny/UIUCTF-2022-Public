@@ -1,0 +1,489 @@
+From 20a9ab12455f1ce7ae71cdffd060611d88d8b59f Mon Sep 17 00:00:00 2001
+From: YiFei Zhu <zhuyifei@google.com>
+Date: Mon, 28 Mar 2022 19:04:30 -0700
+Subject: [PATCH 4/8] Add UEFI Binexec
+
+Signed-off-by: YiFei Zhu <zhuyifei@google.com>
+---
+ MdeModulePkg/Application/Binexec/Binexec.c   | 406 +++++++++++++++++++
+ MdeModulePkg/Application/Binexec/Binexec.inf |  41 ++
+ OvmfPkg/OvmfPkgX64.dsc                       |   2 +
+ 3 files changed, 449 insertions(+)
+ create mode 100644 MdeModulePkg/Application/Binexec/Binexec.c
+ create mode 100644 MdeModulePkg/Application/Binexec/Binexec.inf
+
+diff --git a/MdeModulePkg/Application/Binexec/Binexec.c b/MdeModulePkg/Application/Binexec/Binexec.c
+new file mode 100644
+index 0000000000..de15b5d75e
+--- /dev/null
++++ b/MdeModulePkg/Application/Binexec/Binexec.c
+@@ -0,0 +1,406 @@
++// SPDX-License-Identifier: Apache-2.0
++/*
++ * Copyright 2021 Google LLC.
++ */
++
++#include <Library/BaseMemoryLib.h>
++#include <Library/DebugLib.h>
++#include <Library/MemoryAllocationLib.h>
++#include <Library/UefiApplicationEntryPoint.h>
++#include <Library/UefiBootServicesTableLib.h>
++#include <Library/UefiLib.h>
++
++#include <Protocol/SmmCommunication.h>
++
++// x86 longest instruction is 15 bytes, so why not 16 rets here?
++#define RET_OP "\xc3\xc3\xc3\xc3\xc3\xc3\xc3\xc3\xc3\xc3\xc3\xc3\xc3\xc3\xc3\xc3"
++
++#define CODE_BUF_SIZE 1048576
++STATIC CHAR8 mCodeBuf[CODE_BUF_SIZE + sizeof(RET_OP)];
++
++STATIC CONST CHAR16 *mIntro =
++  L"Welcome to binexec!\n"
++  L"Type some shellcode in hex and I'll run it!\n"
++  L"\n"
++  L"Type the word 'done' on a seperate line and press enter to execute\n"
++  L"Type 'exit' on a seperate line and press enter to quit the program\n";
++
++EFI_SMM_COMMUNICATION_PROTOCOL  *mSmmCommunication = NULL;
++extern EFI_GUID gEfiSmmCowsayCommunicationGuid;
++
++typedef struct {
++  UINTN REG_RAX;
++  UINTN REG_RBX;
++  UINTN REG_RCX;
++  UINTN REG_RDX;
++  UINTN REG_RSI;
++  UINTN REG_RDI;
++  UINTN REG_RBP;
++  UINTN REG_R8;
++  UINTN REG_R9;
++  UINTN REG_R10;
++  UINTN REG_R11;
++  UINTN REG_R12;
++  UINTN REG_R13;
++  UINTN REG_R14;
++  UINTN REG_R15;
++} ARCH_REGS;
++
++VOID
++Cowsay (
++  IN CONST CHAR16 *Message
++  )
++{
++  EFI_SMM_COMMUNICATE_HEADER *Buffer;
++  UINTN MessageLen = StrLen(Message) * sizeof(CHAR16);
++
++  Buffer = AllocateRuntimeZeroPool(sizeof(*Buffer) + MessageLen);
++  if (!Buffer)
++    return;
++
++  Buffer->HeaderGuid = gEfiSmmCowsayCommunicationGuid;
++  Buffer->MessageLength = MessageLen;
++  CopyMem(Buffer->Data, Message, MessageLen);
++
++  mSmmCommunication->Communicate(
++    mSmmCommunication,
++    Buffer,
++    NULL
++  );
++
++  FreePool(Buffer);
++}
++
++CHAR8
++Unhex (
++  IN CHAR16 Chr
++  )
++{
++  if (Chr >= L'0' && Chr <= L'9')
++    return Chr - L'0';
++  else if (Chr >= L'A' && Chr <= L'F')
++    return Chr - L'A' + 10;
++
++  ASSERT(FALSE);
++  return 0;
++}
++
++VOID
++EFIAPI
++ShowRegs (
++  IN ARCH_REGS *Regs
++  )
++{
++#define SHOW_REG_ONE(REGNAME) do {              \
++  Print(L ## #REGNAME ": 0x%0L16X", Regs->REG_ ## REGNAME); \
++} while (0)
++
++#define SHOW_REG_THREE(A, B, C) do { \
++  SHOW_REG_ONE(A);                   \
++  Print(L" ");                       \
++  SHOW_REG_ONE(B);                   \
++  Print(L" ");                       \
++  SHOW_REG_ONE(C);                   \
++  Print(L"\n");                      \
++} while (0)
++
++#define REG_R08 REG_R8
++#define REG_R09 REG_R9
++
++  SHOW_REG_THREE(RAX, RBX, RCX);
++  SHOW_REG_THREE(RDX, RSI, RDI);
++  SHOW_REG_THREE(RBP, R08, R09);
++  SHOW_REG_THREE(R10, R11, R12);
++  SHOW_REG_THREE(R13, R14, R15);
++}
++
++EFI_STATUS
++EFIAPI
++UefiMain (
++  IN EFI_HANDLE        ImageHandle,
++  IN EFI_SYSTEM_TABLE  *SystemTable
++  )
++{
++  EFI_STATUS Status;
++  CHAR16 *Line = NULL;
++  UINTN LineSize = 0;
++
++  ASSERT(gST->ConIn);
++  ASSERT(gST->ConOut);
++
++  Status = gBS->LocateProtocol(
++    &gEfiSmmCommunicationProtocolGuid,
++    NULL,
++    (VOID **)&mSmmCommunication
++    );
++  ASSERT_EFI_ERROR(Status);
++
++  gBS->SetWatchdogTimer(0, 0, 0, NULL);
++
++  Cowsay(mIntro);
++  Print(L"\n");
++
++  // Execute loop
++  while (TRUE) {
++    UINTN CodeBufOff = 0;
++
++    Print(L"Address of SystemTable: 0x%0L16X\n", gST);
++    Print(L"Address where I'm gonna run your code: 0x%0L16X\n", mCodeBuf);
++
++    // Line loop
++    while (TRUE) {
++      UINTN LineOff = 0;
++      CHAR16 PrintChr[2] = {0};
++
++      // Character loop
++      while (TRUE) {
++        EFI_INPUT_KEY Key;
++        UINTN Index;
++
++        Status = gBS->WaitForEvent(1, &gST->ConIn->WaitForKey, &Index);
++        ASSERT_EFI_ERROR(Status);
++
++        if (Index != 0)
++          continue;
++
++        gST->ConIn->ReadKeyStroke(gST->ConIn, &Key);
++
++        ASSERT(LineOff <= LineSize);
++
++        // Fixups... serial shenanigans?
++        if (Key.UnicodeChar == 0)
++          Key.UnicodeChar = CHAR_BACKSPACE;
++        if (Key.UnicodeChar == CHAR_CARRIAGE_RETURN)
++          Key.UnicodeChar = CHAR_LINEFEED;
++
++        if (LineOff > 0 && Key.UnicodeChar == CHAR_BACKSPACE)
++          goto accept;
++
++        switch (Key.UnicodeChar) {
++          case L'D':
++          case L'd':
++            if (LineOff == 0)
++              goto accept;
++            break;
++          case L'O':
++          case L'o':
++            if (LineOff == 1 && Line[0] == L'D')
++              goto accept;
++            break;
++          case L'N':
++          case L'n':
++            if (LineOff == 2 && Line[0] == L'D' && Line[1] == L'O')
++              goto accept;
++            break;
++          case L'E':
++          case L'e':
++            if (LineOff == 3 && Line[0] == L'D' && Line[1] == L'O' && Line[2] == L'N')
++              goto accept;
++            break;
++          case CHAR_LINEFEED:
++            if (LineOff == 4 && Line[0] == L'D' && Line[1] == L'O' && Line[2] == L'N' && Line[3] == L'E')
++              goto accept;
++            break;
++        }
++
++        switch (Key.UnicodeChar) {
++          case L'E':
++          case L'e':
++            if (LineOff == 0)
++              goto accept;
++            break;
++          case L'X':
++          case L'x':
++            if (LineOff == 1 && Line[0] == L'E')
++              goto accept;
++            break;
++          case L'I':
++          case L'i':
++            if (LineOff == 2 && Line[0] == L'E' && Line[1] == L'X')
++              goto accept;
++            break;
++          case L'T':
++          case L't':
++            if (LineOff == 3 && Line[0] == L'E' && Line[1] == L'X' && Line[2] == L'I')
++              goto accept;
++            break;
++          case CHAR_LINEFEED:
++            if (LineOff == 4 && Line[0] == L'E' && Line[1] == L'X' && Line[2] == L'I' && Line[3] == L'T')
++              goto accept;
++            break;
++        }
++
++        if ((L'0' <= Key.UnicodeChar && Key.UnicodeChar <= L'9') ||
++            (L'a' <= Key.UnicodeChar && Key.UnicodeChar <= L'f') ||
++            (L'A' <= Key.UnicodeChar && Key.UnicodeChar <= L'F') ||
++            (Key.UnicodeChar == CHAR_LINEFEED && LineOff && LineOff % 2 == 0)) {
++          for (UINTN i = 0; i < LineOff; i++) {
++            if ((L'0' <= Line[i] && Line[i] <= L'9') ||
++                (L'A' <= Line[i] && Line[i] <= L'F') )
++              continue;
++
++            goto nothex;
++          }
++
++          goto accept;
++        }
++
++nothex:
++        continue;
++
++accept:
++        if (Key.UnicodeChar == CHAR_BACKSPACE) {
++          ASSERT(LineOff > 0);
++          LineOff--;
++
++          Print(L"\b \b");
++          continue;
++        }
++
++        PrintChr[0] = Key.UnicodeChar;
++        Print(PrintChr);
++
++        if (Key.UnicodeChar == CHAR_LINEFEED)
++          break;
++
++        // Lower to upper
++        if (L'a' <= Key.UnicodeChar && Key.UnicodeChar <= L'z')
++          Key.UnicodeChar = Key.UnicodeChar - L'a' + L'A';
++
++        if (LineOff + 1 > LineSize) {
++          CHAR16 *NewLine = ReallocatePool(LineSize * sizeof(CHAR16),
++                                           (LineSize * 2 + 1) * sizeof(CHAR16),
++                                           Line);
++          if (!NewLine) {
++            Print(L"Out of memory\n");
++            if (Line)
++              FreePool(Line);
++            Exit(EFI_OUT_OF_RESOURCES);
++          }
++
++          LineSize = LineSize * 2 + 1;
++          Line = NewLine;
++          ASSERT(LineOff + 1 <= LineSize);
++        }
++
++        Line[LineOff++] = Key.UnicodeChar;
++      }
++
++      if (!Line)
++        continue;
++
++      if (LineOff == 4 && Line[0] == L'D' && Line[1] == L'O' && Line[2] == L'N' && Line[3] == L'E')
++        break;
++      if (LineOff == 4 && Line[0] == L'E' && Line[1] == L'X' && Line[2] == L'I' && Line[3] == L'T') {
++        FreePool(Line);
++        Exit(EFI_SUCCESS);
++      }
++
++      ASSERT(LineOff % 2 == 0);
++
++      for (UINTN i = 0; i < LineOff; i += 2) {
++        if (CodeBufOff >= CODE_BUF_SIZE) {
++          Print(L"Out of buffer space\n");
++          Exit(EFI_OUT_OF_RESOURCES);
++        }
++
++        mCodeBuf[CodeBufOff++] = (Unhex(Line[i]) << 4) | Unhex(Line[i + 1]);
++      }
++    }
++
++    Print(L"Running...\n");
++
++    CopyMem(mCodeBuf + CodeBufOff, RET_OP, sizeof(RET_OP));
++
++    __asm__ __volatile__ (
++      // save registers for clobber
++      "push %%r15\n"
++      "push %%r14\n"
++      "push %%r13\n"
++      "push %%r12\n"
++      "push %%r11\n"
++      "push %%r10\n"
++      "push %%r9\n"
++      "push %%r8\n"
++      "push %%rbp\n"
++      "push %%rdi\n"
++      "push %%rsi\n"
++      "push %%rdx\n"
++      "push %%rcx\n"
++      "push %%rbx\n"
++      "push %%rax\n"
++
++      "add $-0x70,%%rsp\n"
++      "stmxcsr 0x60(%%rsp)\n"
++      "movdqa %%xmm0,0x0(%%rsp)\n"
++      "movdqa %%xmm1,0x10(%%rsp)\n"
++      "movdqa %%xmm2,0x20(%%rsp)\n"
++      "movdqa %%xmm3,0x30(%%rsp)\n"
++      "movdqa %%xmm4,0x40(%%rsp)\n"
++      "movdqa %%xmm5,0x50(%%rsp)\n"
++
++      // invoke procedure
++      "call *%%rax\n"
++
++      // save registers for display
++      "push %%r15\n"
++      "push %%r14\n"
++      "push %%r13\n"
++      "push %%r12\n"
++      "push %%r11\n"
++      "push %%r10\n"
++      "push %%r9\n"
++      "push %%r8\n"
++      "push %%rbp\n"
++      "push %%rdi\n"
++      "push %%rsi\n"
++      "push %%rdx\n"
++      "push %%rcx\n"
++      "push %%rbx\n"
++      "push %%rax\n"
++
++      // display regs
++      "mov %%rsp,%%rcx\n"
++      "mov %%rsp,%%rbp\n"
++      "sub $32,%%rsp\n" // shadow space in the calling convention
++      "and $-16,%%rsp\n" // aligning stack, just in case
++      "call ShowRegs\n"
++      "mov %%rbp,%%rsp\n"
++
++      // undo save 2
++      "add $120,%%rsp\n"
++
++      // restore save 1
++
++      "ldmxcsr 0x60(%%rsp)\n"
++      "movdqa 0x0(%%rsp),%%xmm0\n"
++      "movdqa 0x10(%%rsp),%%xmm1\n"
++      "movdqa 0x20(%%rsp),%%xmm2\n"
++      "movdqa 0x30(%%rsp),%%xmm3\n"
++      "movdqa 0x40(%%rsp),%%xmm4\n"
++      "movdqa 0x50(%%rsp),%%xmm5\n"
++      "add $0x70,%%rsp\n"
++
++      "pop %%rax\n"
++      "pop %%rbx\n"
++      "pop %%rcx\n"
++      "pop %%rdx\n"
++      "pop %%rsi\n"
++      "pop %%rdi\n"
++      "pop %%rbp\n"
++      "pop %%r8\n"
++      "pop %%r9\n"
++      "pop %%r10\n"
++      "pop %%r11\n"
++      "pop %%r12\n"
++      "pop %%r13\n"
++      "pop %%r14\n"
++      "pop %%r15\n"
++      :
++      : "a"(&mCodeBuf), "b"(gST), "irm"(ShowRegs)
++      : "cc", "memory"
++    );
++
++    Print(L"Done! Type more code\n");
++  }
++}
+diff --git a/MdeModulePkg/Application/Binexec/Binexec.inf b/MdeModulePkg/Application/Binexec/Binexec.inf
+new file mode 100644
+index 0000000000..3632d52ca9
+--- /dev/null
++++ b/MdeModulePkg/Application/Binexec/Binexec.inf
+@@ -0,0 +1,41 @@
++## @file
++#  This is the shell sorting testing application
++#
++#  Copyright (c) 2009 - 2018, Intel Corporation. All rights reserved.<BR>
++#  Copyright (c) 2021 - 2022, Google LLC.
++#
++#  SPDX-License-Identifier: BSD-2-Clause-Patent
++#
++#
++##
++
++[Defines]
++  INF_VERSION                    = 0x00010005
++  BASE_NAME                      = Binexec
++  FILE_GUID                      = 5037CB1B-932C-4A9F-A2B8-0D3A2A557174
++  MODULE_TYPE                    = UEFI_APPLICATION
++  VERSION_STRING                 = 1.0
++  ENTRY_POINT                    = UefiMain
++
++[Sources]
++  Binexec.c
++
++[Packages]
++  MdePkg/MdePkg.dec
++  ShellPkg/ShellPkg.dec
++  MdeModulePkg/MdeModulePkg.dec
++
++[LibraryClasses]
++  BaseMemoryLib
++  DebugLib
++  MemoryAllocationLib
++  UefiApplicationEntryPoint
++  UefiBootServicesTableLib
++  UefiLib
++
++[Guids]
++  gEfiSmmCowsayCommunicationGuid  ## SOMETIMES_CONSUMES ## GUID
++  gEdkiiPiSmmCommunicationRegionTableGuid  ## SOMETIMES_CONSUMES ## SystemTable
++
++[Protocols]
++  gEfiSmmCommunicationProtocolGuid  ## SOMETIMES_CONSUMES
+diff --git a/OvmfPkg/OvmfPkgX64.dsc b/OvmfPkg/OvmfPkgX64.dsc
+index 34e3803524..48f8da03f2 100644
+--- a/OvmfPkg/OvmfPkgX64.dsc
++++ b/OvmfPkg/OvmfPkgX64.dsc
+@@ -1012,6 +1012,8 @@
+       gEfiMdePkgTokenSpaceGuid.PcdUefiLibMaxPrintBufferSize|8000
+   }
+ 
++  MdeModulePkg/Application/Binexec/Binexec.inf
++
+ !if $(SECURE_BOOT_ENABLE) == TRUE
+   SecurityPkg/VariableAuthenticated/SecureBootConfigDxe/SecureBootConfigDxe.inf
+   OvmfPkg/EnrollDefaultKeys/EnrollDefaultKeys.inf
+-- 
+2.35.1
+

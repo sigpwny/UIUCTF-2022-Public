@@ -1,0 +1,21 @@
+apiVersion: kctf.dev/v1
+kind: Challenge
+metadata:
+  name: command-not-found
+spec:
+  deployed: true
+  powDifficultySeconds: 0
+  network:
+    public: true
+    ports:
+      - protocol: "TCP"
+        port: 1337
+        targetPort: 1337
+  healthcheck:
+    enabled: true
+    image: us.gcr.io/dotted-forest-314903/command-not-found-healthcheck:d2bb2173c8e3cb85077ee3204fcbe0d14dba6e95d4e622413119074923fc29da
+  image: us.gcr.io/dotted-forest-314903/command-not-found-challenge:3d0ba286983311acba4e5fafa6b4bf648f064092ece15066b5bbd82cc64789d4
+  horizontalPodAutoscalerSpec:
+    maxReplicas: 8
+    minReplicas: 2
+    targetCPUUtilizationPercentage: 60

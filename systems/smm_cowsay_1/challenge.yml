@@ -1,0 +1,27 @@
+name: "SMM Cowsay 1"
+author: "YiFei Zhu"
+category: systems
+description: |-
+  One of our engineers thought it would be a good idea to write Cowsay
+  inside SMM. Then someone outside read out the trade secret (a.k.a. flag)
+  stored at physical address 0x44440000, and since it could only be read
+  from SMM, that can only mean one thing: it... was a horrible idea.
+
+  `$ stty raw -echo isig; nc smm-cowsay-1.chal.uiuc.tf 1337`
+
+  **author**: YiFei Zhu
+value: 500
+type: dynamic
+extra:
+  initial: 500
+  decay: 75
+  minimum: 50
+flags:
+  - uiuctf{when_ring_zero_is_insufficient_35250e18}
+tags:
+  - systems
+  - smm
+files:
+  - challenge/handout.tar.zst
+state: visible
+version: "0.1"

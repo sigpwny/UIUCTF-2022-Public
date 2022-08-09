@@ -1,0 +1,24 @@
+name: "Firefox Shell 2"
+author: "YiFei Zhu"
+category: jail
+description: |-
+  We shouldn't have trusted the docs.
+
+  `$ nc firefox-cli-2.chal.uiuc.tf 1337`
+
+  **author**: YiFei Zhu
+value: 500
+type: dynamic
+extra:
+  initial: 500
+  decay: 75
+  minimum: 50
+flags:
+  - uiuctf{sandbox_escape_but_into_another_sandbox_faa5e91d}
+tags:
+  - jail
+  - firefox
+files:
+  - handout.tar.gz
+state: visible
+version: "0.1"

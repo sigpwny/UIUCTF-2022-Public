@@ -1,0 +1,14 @@
+apiVersion: kctf.dev/v1
+kind: Challenge
+metadata:
+  name: ring
+spec:
+  deployed: true
+  powDifficultySeconds: 0
+  network:
+    public: true
+  healthcheck:
+    # TIP: disable the healthcheck during development
+    enabled: true
+    image: us.gcr.io/dotted-forest-314903/ring-healthcheck:ca230041b6f865130558c555ce7ae24c80f2f56afd0330075c4d491191cffe1e
+  image: us.gcr.io/dotted-forest-314903/ring-challenge:ef57d4b31c49b244db9615f58247fc6e8b5866db6eaeeeb98672116ff6bd2ccf

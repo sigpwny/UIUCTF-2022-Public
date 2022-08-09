@@ -1,0 +1,30 @@
+# This file represents the base specification of your challenge. It is used by
+# other tools to install and deploy your challenge.
+
+# Required sections
+name: "Frame"
+author: "Emma + Minh"
+category: web
+description: |-
+  We made it easy to add a frame to your digital art!
+
+  https://frame-web.chal.uiuc.tf/
+
+  **authors**: Emma + Minh
+value: 500
+type: dynamic
+tags:
+  - web
+  - php
+  - beginner
+extra:
+  initial: 500
+  decay: 75
+  minimum: 50
+flags:
+  - uiuctf{th1nk1ng_0uts1de_th3_fr4m3}
+files:
+ - ./handout.tar.gz
+# This is visible by default. It takes two values: hidden, visible.
+state: visible
+version: "0.1"

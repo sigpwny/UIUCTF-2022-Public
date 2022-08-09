@@ -1,0 +1,18 @@
+apiVersion: kctf.dev/v1
+kind: Challenge
+metadata:
+  name: neigh
+spec:
+  deployed: true
+  powDifficultySeconds: 0
+  network:
+    public: true
+    ports:
+      - protocol: "TCP"
+        port: 1337
+        targetPort: 1337
+  healthcheck:
+    # TIP: disable the healthcheck during development
+    enabled: true
+    image: us.gcr.io/dotted-forest-314903/neigh-healthcheck:a836d2f56f261fe8855fb617c2b3032d29e8e269f07930f42355d68e83479bb2
+  image: us.gcr.io/dotted-forest-314903/neigh-challenge:839ad2eeb89861310c8764070e386a15992afcc2246b9205177e7a81961a5781

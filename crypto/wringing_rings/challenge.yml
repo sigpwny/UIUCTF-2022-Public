@@ -1,0 +1,22 @@
+name: "Wringing Rings"
+author: "Spamakin"
+category: crypto
+description: |-
+  Everyone says we should use finite fields, but I loved sharing secrets this way so much that I put a ring on it!
+
+  `$ nc ring.chal.uiuc.tf 1337`
+
+  **author:** Spamakin
+value: 500
+type: dynamic
+extra:
+  initial: 500
+  decay: 75
+  minimum: 50
+flags:
+  - uiuctf{turn5_0ut_th4t_th3_1nt3g3r5_4l50_5uck}
+tags:
+  - crypto
+files:
+  - challenge/server.py
+state: hidden

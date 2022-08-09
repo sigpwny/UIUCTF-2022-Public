@@ -1,0 +1,8 @@
+export/
+export.tar.gz
+
+# ignore build files
+**/*.cil.c
+**/*.cil.i
+**/*.i
+**/*.o

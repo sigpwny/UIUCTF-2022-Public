@@ -1,0 +1,60 @@
+/* 
+@font-face {
+    font-family: mc;
+    src: url(mc.ttf);
+  }
+   */
+  body, html {
+      height: 100%;
+      margin: 0;
+  }
+  
+  .bg {
+  
+      background: linear-gradient( rgba(75, 73, 201, 0.5), rgba(0, 0, 0, 0.5) );
+  
+      height: 100%;
+  
+      background-position: center;
+      background-repeat: no-repeat;
+      background-size: cover;
+  }
+  
+  /* .overlay {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      text-align: center;
+  }
+  
+  .container {
+      position: relative;
+      width: 349px;
+      height: 168px;
+      left: 50%;
+      transform: translateX(-50%);
+  }
+  
+  .captcha {
+      position: absolute;
+      width: 220px;
+      height: 118px;
+      left: 117px;
+      top: 24px;
+  }
+  
+  .enchant {
+      position: relative;
+      top: 0;
+      left: 0;
+  }
+  
+  .overlay input {
+      font-family: mc;
+  }
+  
+  h1, h2 {
+      color: white;
+      font-family: mc;
+  } */

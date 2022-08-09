@@ -1,0 +1,29 @@
+name: "SMM Cowsay 3"
+author: "YiFei Zhu"
+category: systems
+description: |-
+  We fired that engineer. Unfortunately, other engineers refused to touch
+  this code, but instead suggested to integrate some ASLR code found online.
+  Additionally, we hardened the system with SMM_CODE_CHK_EN and kept DEP on.
+  Now that we have the monster combination of ASLR+DEP, we should surely be
+  secure, right?
+
+  `$ stty raw -echo isig; nc smm-cowsay-3.chal.uiuc.tf 1337`
+
+  **author**: YiFei Zhu
+value: 500
+type: dynamic
+extra:
+  initial: 500
+  decay: 75
+  minimum: 50
+flags:
+  - uiuctf{uefi_is_hard_and_vendors_dont_care_1403c057}
+tags:
+  - systems
+  - smm
+  - extreme
+files:
+  - challenge/handout.tar.zst
+state: visible
+version: "0.1"

@@ -1,0 +1,23 @@
+name: "Military Grade Encryption"
+author: "Husnain"
+category: crypto
+description: |-
+  I came across a new website that claims to keep my flag safe with military-grade encryption. Clearly, this is going to keep my flag safe from anyone who may want it. 
+
+  https://military-grade-encryption-web.chal.uiuc.tf/
+
+  **author**: Husnain
+value: 500
+type: dynamic
+extra:
+  initial: 500
+  decay: 75
+  minimum: 50
+flags:
+  - uiuctf{n0t_eNou6h_3ntr0py_4_H4ndr0113d_Crypto}
+tags:
+  - crypto
+  - beginner
+files:
+  - challenge.tar.gz
+state: hidden

@@ -1,0 +1,31 @@
+<!doctype html>
+
+
+<html>
+	<title>blackboxwarrior</title>
+	<link rel="stylesheet" href="{{url_for('static', filename='style.css')}}">
+	
+	<body>
+		<div class="bg"/>
+		
+		<div class=overlay>
+			<div>
+				pull off the best heist in art history! <br>
+				our ai assistant is checking all art at the door to make sure it isn't ours. <br>
+				can you fool them into letting you walk away? <br>
+				make sure not to deface the art too badly, or it won't be valuable enough to steal! <br><br>
+			</div>
+			<div class="container">
+				<img class="show" src="data:image/png;base64,{{b64png}}"/>
+			</div>
+			
+			<form action = "?" method = "POST" 
+				enctype = "multipart/form-data">
+				<input type = "file" name = "file" />
+				<input type = "submit"/>
+			</form>
+		
+			<div id="response">{{response}}</div>
+		</div>
+	</body>
+</html>
